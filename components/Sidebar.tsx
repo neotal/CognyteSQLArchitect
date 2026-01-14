@@ -16,50 +16,75 @@ const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDe
       <div className="p-6 border-b border-slate-100">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center text-slate-800">
-            <Users className="w-5 h-5 mr-2 text-blue-500" />
-            <h2 className="font-bold text-lg">Groups</h2>
+            <Users className="w-5 h-5 mr-2 text-blue-600" />
+            <h2 className="font-bold text-lg tracking-tight">Project Groups</h2>
           </div>
           <button 
-            onClick={onAddGroup}
-            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-full transition-colors"
+            onClick={(e) => {
+              e.preventDefault();
+              onAddGroup();
+            }}
+            className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95"
+            title="Create New Group"
           >
             <Plus className="w-5 h-5" />
           </button>
         </div>
-        <p className="text-xs text-slate-400 leading-tight">
-          Organize your tables into functional areas with color coding.
+        <p className="text-[10px] text-slate-400 leading-tight font-black uppercase tracking-wider">
+          Visual containers for table logic.
         </p>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
         {groups.map(group => (
           <div 
             key={group.id} 
-            className="group flex items-center justify-between p-3 rounded-xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all"
+            className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-white hover:border-blue-200 hover:shadow-sm transition-all cursor-default"
           >
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-3 overflow-hidden flex-1">
               <div 
-                className="w-3 h-3 rounded-full shadow-sm" 
+                className="w-4 h-4 rounded shadow-sm flex-shrink-0" 
                 style={{ backgroundColor: group.color }}
               />
-              <span className="font-medium text-slate-700">{group.name}</span>
+              <span className="font-bold text-slate-700 truncate text-sm">{group.name}</span>
             </div>
-            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center space-x-1 ml-2">
               <button 
-                onClick={() => onEditGroup(group)}
-                className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-blue-500 transition-all"
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { 
+                  e.preventDefault();
+                  e.stopPropagation(); 
+                  onEditGroup(group); 
+                }}
+                className="p-2 hover:bg-blue-50 rounded-lg text-slate-300 hover:text-blue-500 transition-all active:scale-90"
+                title="Edit Group"
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
               <button 
-                onClick={() => onDeleteGroup(group.id)}
-                className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-slate-400 hover:text-red-500 transition-all"
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { 
+                  e.preventDefault();
+                  e.stopPropagation(); 
+                  onDeleteGroup(group.id); 
+                }}
+                className="p-2 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-all active:scale-90"
+                title="Delete Group"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         ))}
+      </div>
+      
+      <div className="p-4 border-t border-slate-50 bg-slate-50/50">
+        <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <span>Schema Inventory</span>
+          <span className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-mono">{groups.length} Groups</span>
+        </div>
       </div>
     </div>
   );
