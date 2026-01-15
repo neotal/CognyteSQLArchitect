@@ -23,6 +23,10 @@ export interface Table {
   groupIds: string[];
   columns: Column[];
   position: { x: number; y: number };
+  isCollapsed?: boolean;
+  sourceSystem?: string;
+  businessArea?: string;
+  businessUnit?: string;
 }
 
 export interface Relationship {

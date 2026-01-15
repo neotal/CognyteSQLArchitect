@@ -15,10 +15,11 @@ interface CanvasProps {
   onEditTable: (table: Table) => void;
   onDeleteTable: (id: string) => void;
   onDeleteRelation: (id: string) => void;
+  onToggleCollapse: (id: string) => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({ 
-  tables, groups, relationships, zoom, setTables, setGroups, onEditTable, onDeleteTable, onDeleteRelation 
+  tables, groups, relationships, zoom, setTables, setGroups, onEditTable, onDeleteTable, onDeleteRelation, onToggleCollapse
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingEntity, setDraggingEntity] = useState<{ id: string, type: 'table' | 'group' } | null>(null);
@@ -45,7 +46,6 @@ const Canvas: React.FC<CanvasProps> = ({
     if (draggingEntity.type === 'table') {
       setTables(prev => prev.map(t => t.id === draggingEntity.id ? { ...t, position: { x: newX, y: newY } } : t));
     } else {
-      // Dragging a group: move the group AND its associated tables
       const group = groups.find(g => g.id === draggingEntity.id);
       if (!group) return;
 
@@ -54,7 +54,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
       setGroups(prev => prev.map(g => g.id === draggingEntity.id ? { ...g, position: { x: newX, y: newY } } : g));
       
-      // Move all tables that visually belong to this group
       setTables(prev => prev.map(t => {
         const belongsToThisGroup = t.groupIds[0] === draggingEntity.id;
         if (belongsToThisGroup) {
@@ -125,6 +124,7 @@ const Canvas: React.FC<CanvasProps> = ({
             onMouseDown={(e) => handleMouseDown(table.id, 'table', e)}
             onEdit={() => onEditTable(table)}
             onDelete={() => onDeleteTable(table.id)}
+            onToggleCollapse={() => onToggleCollapse(table.id)}
           />
         ))}
       </div>

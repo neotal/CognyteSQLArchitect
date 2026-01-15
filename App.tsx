@@ -22,24 +22,33 @@ const App: React.FC = () => {
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const isInitialLoadComplete = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('sql-planner-state-v5');
+    const saved = localStorage.getItem('cognyte-sql-planner-state');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setTables(parsed.tables || []);
-        setGroups(parsed.groups || [{ id: 'default', name: 'Main Project', color: '#3b82f6', position: { x: 50, y: 50 }, size: { width: 600, height: 500 } }]);
-        setRelationships(parsed.relationships || []);
-        setZoom(parsed.zoom || 1);
+        if (parsed.tables) setTables(parsed.tables);
+        if (parsed.groups) setGroups(parsed.groups);
+        if (parsed.relationships) setRelationships(parsed.relationships);
+        if (parsed.zoom) setZoom(parsed.zoom);
       } catch (e) {
         console.error("Failed to parse saved state", e);
       }
     }
+    setTimeout(() => {
+      isInitialLoadComplete.current = true;
+    }, 100);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('sql-planner-state-v5', JSON.stringify({ tables, groups, relationships, zoom }));
+    if (isInitialLoadComplete.current) {
+      const stateToSave = { tables, groups, relationships, zoom };
+      localStorage.setItem('cognyte-sql-planner-state', JSON.stringify(stateToSave));
+    }
   }, [tables, groups, relationships, zoom]);
 
   const handleAddTable = (tableData: Partial<Table>) => {
@@ -53,6 +62,7 @@ const App: React.FC = () => {
       color: tableData.color || DEFAULT_COLORS[Math.floor(Math.random() * DEFAULT_COLORS.length)],
       groupIds: tableData.groupIds || [targetGroupId],
       columns: tableData.columns || [],
+      isCollapsed: false,
       position: { 
         x: (targetGroup?.position.x || 100) + 50 + (Math.random() * 50), 
         y: (targetGroup?.position.y || 100) + 80 + (Math.random() * 50) 
@@ -90,8 +100,12 @@ const App: React.FC = () => {
     setEditingTable(null);
   };
 
+  const toggleTableCollapse = (id: string) => {
+    setTables(prev => prev.map(t => t.id === id ? { ...t, isCollapsed: !t.isCollapsed } : t));
+  };
+
   const handleDeleteTable = (id: string) => {
-    if (window.confirm("Permanently delete this table?")) {
+    if (window.confirm("Are you sure you want to permanently delete this table?")) {
       setTables(prev => prev.filter(t => t.id !== id));
       setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
     }
@@ -118,7 +132,7 @@ const App: React.FC = () => {
   const handleUpdateGroup = (group: Group) => {
     const isDuplicateName = groups.some(g => g.id !== group.id && g.name.toLowerCase() === group.name.toLowerCase());
     if (isDuplicateName) {
-      alert("Another group already has this name.");
+      alert("This group name is already taken.");
       return;
     }
     setGroups(prev => prev.map(g => g.id === group.id ? group : g));
@@ -127,21 +141,18 @@ const App: React.FC = () => {
   };
 
   const handleDeleteGroup = (id: string) => {
-    // 1. Check minimum groups requirement
     if (groups.length <= 1) {
-      alert("חייבת להיות לפחות קבוצה אחת בפרויקט.");
+      alert("The project must have at least one group.");
       return;
     }
 
-    // 2. Check if any tables are assigned to this group
     const tablesInGroup = tables.filter(t => t.groupIds.includes(id));
     if (tablesInGroup.length > 0) {
-      alert(`אי אפשר למחוק את הקבוצה "${groups.find(g => g.id === id)?.name}" כי יש בה ${tablesInGroup.length} טבלאות. נא למחוק או להעביר אותן לקבוצה אחרת לפני המחיקה.`);
+      alert(`Cannot delete this group because it contains ${tablesInGroup.length} tables. Please move or delete them first.`);
       return;
     }
     
-    // 3. Confirm and delete
-    if (window.confirm("האם למחוק את הקבוצה?")) {
+    if (window.confirm("Delete this empty group?")) {
       setGroups(prev => prev.filter(g => g.id !== id));
     }
   };
@@ -162,10 +173,11 @@ const App: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (window.confirm("This will clear ALL tables and relationships. Continue?")) {
+    if (window.confirm("This will clear all tables and groups! Continue?")) {
       setTables([]);
       setRelationships([]);
       setGroups([{ id: 'default', name: 'Main Project', color: '#3b82f6', position: { x: 50, y: 50 }, size: { width: 600, height: 500 } }]);
+      localStorage.removeItem('cognyte-sql-planner-state');
     }
   };
 
@@ -175,8 +187,28 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cognyte-schema.json`;
+    a.download = `cognyte-sql-design.json`;
     a.click();
+  };
+
+  const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.tables) setTables(json.tables);
+        if (json.groups) setGroups(json.groups);
+        if (json.relationships) setRelationships(json.relationships);
+        alert("Design imported successfully!");
+      } catch (err) {
+        alert("Error loading file. Please ensure it is a valid JSON design.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   return (
@@ -195,7 +227,7 @@ const App: React.FC = () => {
               <h1 className="text-xl font-black bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent leading-none">
                 Cognyte
               </h1>
-              <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">SQL Architect</span>
+              <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1 text-left">SQL Architect</span>
             </div>
             
             <div className="h-10 w-[1px] bg-slate-100"></div>
@@ -204,7 +236,7 @@ const App: React.FC = () => {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
               <input 
                 type="text" 
-                placeholder="Find tables or columns..." 
+                placeholder="Search tables or columns..." 
                 className="pl-11 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50/50 focus:border-blue-400 focus:bg-white outline-none w-72 transition-all text-sm font-bold"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -213,9 +245,35 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl">
-               <button onClick={handleExportJSON} title="Export Schema" className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-indigo-600 transition-all shadow-none hover:shadow-sm"><Download className="w-4.5 h-4.5" /></button>
-               <button onClick={handleReset} title="Clear Project" className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-red-500 transition-all shadow-none hover:shadow-sm"><RefreshCcw className="w-4.5 h-4.5" /></button>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl space-x-1">
+               <input 
+                 type="file" 
+                 ref={fileInputRef} 
+                 onChange={handleImportJSON} 
+                 className="hidden" 
+                 accept=".json"
+               />
+               <button 
+                 onClick={() => fileInputRef.current?.click()} 
+                 title="Import Design" 
+                 className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-blue-600 transition-all shadow-none hover:shadow-sm"
+               >
+                 <Upload className="w-4.5 h-4.5" />
+               </button>
+               <button 
+                 onClick={handleExportJSON} 
+                 title="Export Design" 
+                 className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-indigo-600 transition-all shadow-none hover:shadow-sm"
+               >
+                 <Download className="w-4.5 h-4.5" />
+               </button>
+               <button 
+                 onClick={handleReset} 
+                 title="Clear All Data" 
+                 className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-red-500 transition-all shadow-none hover:shadow-sm"
+               >
+                 <RefreshCcw className="w-4.5 h-4.5" />
+               </button>
             </div>
             
             <div className="h-8 w-[1px] bg-slate-100 mx-1"></div>
@@ -246,6 +304,7 @@ const App: React.FC = () => {
             onEditTable={(t) => { setEditingTable(t); setIsTableModalOpen(true); }}
             onDeleteTable={handleDeleteTable}
             onDeleteRelation={handleDeleteRelation}
+            onToggleCollapse={toggleTableCollapse}
           />
 
           <div className="absolute bottom-10 right-10 flex flex-col space-y-3 bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 p-2 z-30">

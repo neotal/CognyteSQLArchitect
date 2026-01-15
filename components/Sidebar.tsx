@@ -25,13 +25,13 @@ const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDe
               onAddGroup();
             }}
             className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm active:scale-95"
-            title="Create New Group"
+            title="New Group"
           >
             <Plus className="w-5 h-5" />
           </button>
         </div>
         <p className="text-[10px] text-slate-400 leading-tight font-black uppercase tracking-wider">
-          Visual containers for table logic.
+          Workspace Management
         </p>
       </div>
 

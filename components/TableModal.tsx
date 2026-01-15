@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Key, Search, Type, Hash, Palette, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, Key, Search, Type, Hash, Palette, AlertCircle, Database, Globe, Briefcase } from 'lucide-react';
 import { Table, Column, Group } from '../types';
 import { DEFAULT_COLORS } from '../constants';
 
@@ -19,6 +19,10 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initialData?.groupIds || [groups[0]?.id || 'default']);
   const [columns, setColumns] = useState<Column[]>(initialData?.columns || [{ id: crypto.randomUUID(), name: 'id', isKey: true }]);
   const [colSearch, setColSearch] = useState('');
+  
+  const [sourceSystem, setSourceSystem] = useState(initialData?.sourceSystem || '');
+  const [businessArea, setBusinessArea] = useState(initialData?.businessArea || '');
+  const [businessUnit, setBusinessUnit] = useState(initialData?.businessUnit || '');
 
   const handleAddColumn = () => {
     setColumns([...columns, { id: crypto.randomUUID(), name: '', isKey: false }]);
@@ -39,17 +43,12 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
     
     const isDuplicateName = allTables.some(t => t.id !== initialData?.id && t.name.toLowerCase() === name.toLowerCase());
     if (isDuplicateName) {
-      alert("A table with this name already exists.");
+      alert("A table with this name already exists in the project.");
       return;
     }
 
     if (selectedGroupIds.length === 0) {
-      alert("Error: You must assign this table to at least one group.");
-      return;
-    }
-
-    if (columns.some(c => !c.name.trim())) {
-      alert("All columns must have valid names.");
+      alert("Error: Table must be assigned to at least one group.");
       return;
     }
 
@@ -59,7 +58,10 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
       description,
       color,
       groupIds: selectedGroupIds,
-      columns
+      columns,
+      sourceSystem: sourceSystem.trim(),
+      businessArea: businessArea.trim(),
+      businessUnit: businessUnit.trim()
     });
   };
 
@@ -67,8 +69,8 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white">
-          <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{initialData ? 'Edit Entity' : 'New Table Entity'}</h2>
+          <div className="text-left">
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{initialData ? 'Edit Table' : 'Create New Table'}</h2>
             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">Define your schema architecture</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full transition-colors"><X className="w-6 h-6 text-slate-300 hover:text-slate-600" /></button>
@@ -78,7 +80,7 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
           <div className="grid grid-cols-2 gap-8">
             <div className="space-y-5">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Technical Name</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Technical Name (SQL)</label>
                 <input 
                   autoFocus
                   required
@@ -90,9 +92,9 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Table Context</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Business Description</label>
                 <textarea 
-                  placeholder="Add a description for hover view..."
+                  placeholder="Explain the purpose of this table..."
                   value={description} 
                   onChange={e => setDescription(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all h-24 text-sm resize-none"
@@ -103,15 +105,7 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
             <div className="space-y-6">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Visual Accent</label>
-                  <div className="flex items-center space-x-1 border border-slate-100 px-1.5 py-0.5 rounded-lg bg-slate-50">
-                    <input 
-                      type="color" 
-                      value={color}
-                      onChange={e => setColor(e.target.value)}
-                      className="w-6 h-6 cursor-pointer border-none bg-transparent"
-                    />
-                  </div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Border Color</label>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {DEFAULT_COLORS.map(c => (
@@ -127,7 +121,7 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
               </div>
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Assign to Group (Required)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Group Assignment (Required)</label>
                   {selectedGroupIds.length === 0 && <AlertCircle className="w-3.5 h-3.5 text-red-500 animate-pulse" />}
                 </div>
                 <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto custom-scrollbar p-1">
@@ -158,15 +152,54 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
             </div>
           </div>
 
+          <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+            <div className="flex items-center space-x-2 mb-2">
+               <Globe className="w-4 h-4 text-blue-500" />
+               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Enterprise Context</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+               <div>
+                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1.5">Source System</label>
+                 <input 
+                   type="text" 
+                   value={sourceSystem} 
+                   onChange={e => setSourceSystem(e.target.value)}
+                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                   placeholder="e.g. SAP, CRM"
+                 />
+               </div>
+               <div>
+                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1.5">Business Area</label>
+                 <input 
+                   type="text" 
+                   value={businessArea} 
+                   onChange={e => setBusinessArea(e.target.value)}
+                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                   placeholder="e.g. Sales, HR"
+                 />
+               </div>
+               <div>
+                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1.5">Business Unit</label>
+                 <input 
+                   type="text" 
+                   value={businessUnit} 
+                   onChange={e => setBusinessUnit(e.target.value)}
+                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                   placeholder="e.g. Global, North"
+                 />
+               </div>
+            </div>
+          </div>
+
           <div className="space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Schema Fields</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Column Structure</label>
               <div className="flex items-center space-x-3">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
                   <input 
                     type="text" 
-                    placeholder="Search fields..." 
+                    placeholder="Search columns..." 
                     value={colSearch}
                     onChange={e => setColSearch(e.target.value)}
                     className="pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 w-44 transition-all"
@@ -177,7 +210,7 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
                   onClick={handleAddColumn}
                   className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black hover:bg-blue-700 transition-all shadow-lg active:scale-95"
                 >
-                  <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Field
+                  <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Column
                 </button>
               </div>
             </div>
@@ -187,7 +220,7 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
                 <div key={col.id} className="p-3.5 flex items-center space-x-3 bg-white hover:bg-blue-50/10 transition-colors group">
                   <button 
                     type="button"
-                    title={col.isKey ? "Primary Key" : "Set Primary Key"}
+                    title={col.isKey ? "Primary Key" : "Set as Primary Key"}
                     onClick={() => handleUpdateColumn(col.id, { isKey: !col.isKey })}
                     className={`p-2.5 rounded-xl transition-all ${col.isKey ? 'bg-amber-100 text-amber-600 shadow-inner' : 'bg-slate-50 text-slate-300 hover:text-amber-500'}`}
                   >
