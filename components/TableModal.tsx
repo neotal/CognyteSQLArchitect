@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Key, Search, Type, Hash, Palette, AlertCircle, Database, Globe, Briefcase } from 'lucide-react';
-import { Table, Column, Group } from '../types';
+import { X, Plus, Trash2, Key, Search, Type, Hash, Palette, AlertCircle, Database, Globe, Briefcase, ChevronDown } from 'lucide-react';
+import { Table, Column, Group, ColumnDataType } from '../types';
 import { DEFAULT_COLORS } from '../constants';
 
 interface TableModalProps {
@@ -12,12 +12,14 @@ interface TableModalProps {
   onClose: () => void;
 }
 
+const DATA_TYPES: ColumnDataType[] = ['Int', 'Numeric', 'String', 'Date', 'Datetime', 'Boolean', 'Binary'];
+
 const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables, onSave, onClose }) => {
   const [name, setName] = useState(initialData?.name || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [color, setColor] = useState(initialData?.color || DEFAULT_COLORS[0]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(initialData?.groupIds || [groups[0]?.id || 'default']);
-  const [columns, setColumns] = useState<Column[]>(initialData?.columns || [{ id: crypto.randomUUID(), name: 'id', isKey: true }]);
+  const [columns, setColumns] = useState<Column[]>(initialData?.columns || [{ id: crypto.randomUUID(), name: 'id', isKey: true, type: 'Int' }]);
   const [colSearch, setColSearch] = useState('');
   
   const [sourceSystem, setSourceSystem] = useState(initialData?.sourceSystem || '');
@@ -25,7 +27,7 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
   const [businessUnit, setBusinessUnit] = useState(initialData?.businessUnit || '');
 
   const handleAddColumn = () => {
-    setColumns([...columns, { id: crypto.randomUUID(), name: '', isKey: false }]);
+    setColumns([...columns, { id: crypto.randomUUID(), name: '', isKey: false, type: 'String' }]);
   };
 
   const handleRemoveColumn = (id: string) => {
@@ -49,6 +51,11 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
 
     if (selectedGroupIds.length === 0) {
       alert("Error: Table must be assigned to at least one group.");
+      return;
+    }
+
+    if (columns.some(c => !c.name.trim())) {
+      alert("Error: All columns must have a name.");
       return;
     }
 
@@ -234,6 +241,16 @@ const TableModal: React.FC<TableModalProps> = ({ groups, initialData, allTables,
                       onChange={e => handleUpdateColumn(col.id, { name: e.target.value })}
                       className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     />
+                  </div>
+                  <div className="relative">
+                    <select 
+                      value={col.type}
+                      onChange={e => handleUpdateColumn(col.id, { type: e.target.value as ColumnDataType })}
+                      className="appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 pr-10 text-xs font-black text-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+                    >
+                      {DATA_TYPES.map(dt => <option key={dt} value={dt}>{dt}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                   </div>
                   <button 
                     type="button"

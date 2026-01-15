@@ -1,10 +1,13 @@
 
 export type RelationType = '1:1' | '1:N' | 'N:1' | 'N:N';
 
+export type ColumnDataType = 'Int' | 'Numeric' | 'String' | 'Date' | 'Datetime' | 'Boolean' | 'Binary';
+
 export interface Column {
   id: string;
   name: string;
   isKey: boolean;
+  type: ColumnDataType;
 }
 
 export interface Group {
