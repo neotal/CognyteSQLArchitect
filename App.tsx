@@ -68,7 +68,7 @@ const App: React.FC = () => {
         y: (targetGroup?.position.y || 100) + 80 + (Math.random() * 50) 
       },
       ...tableData
-    };
+    } as Table;
 
     setTables(prev => [...prev, newTable]);
 
@@ -94,8 +94,26 @@ const App: React.FC = () => {
     setEditingTable(null);
   };
 
-  const handleUpdateTable = (table: Table) => {
-    setTables(prev => prev.map(t => t.id === table.id ? table : t));
+  const handleUpdateTable = (updatedTable: Table) => {
+    setTables(prev => {
+      const oldTable = prev.find(t => t.id === updatedTable.id);
+      let finalTable = { ...updatedTable };
+
+      // If the primary group changed, move the table to the new group's area
+      if (oldTable && oldTable.groupIds[0] !== updatedTable.groupIds[0]) {
+        const newGroupId = updatedTable.groupIds[0];
+        const targetGroup = groups.find(g => g.id === newGroupId);
+        
+        if (targetGroup) {
+          finalTable.position = {
+            x: targetGroup.position.x + 60 + (Math.random() * 40),
+            y: targetGroup.position.y + 100 + (Math.random() * 40)
+          };
+        }
+      }
+
+      return prev.map(t => t.id === updatedTable.id ? finalTable : t);
+    });
     setIsTableModalOpen(false);
     setEditingTable(null);
   };
