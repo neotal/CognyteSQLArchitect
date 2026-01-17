@@ -38,10 +38,8 @@ const TableCard: React.FC<TableCardProps> = memo(({
 
   return (
     <div 
-      className={`absolute bg-white rounded-2xl shadow-xl border-2 select-none group/table overflow-visible transition-all ${isHovering ? 'z-[100] shadow-2xl scale-[1.01]' : 'z-20'}`}
+      className={`relative bg-white rounded-2xl shadow-xl border-2 select-none group/table overflow-visible transition-all ${isHovering ? 'z-[100] shadow-2xl scale-[1.01]' : 'z-20'}`}
       style={{ 
-        left: table.position.x, 
-        top: table.position.y, 
         width: 240, 
         borderColor: table.color,
       }}
@@ -49,7 +47,7 @@ const TableCard: React.FC<TableCardProps> = memo(({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* ENTERPRISE TOOLTIP - Visible on entire card surface hover */}
+      {/* ENTERPRISE TOOLTIP */}
       {isHovering && hasTooltipContent && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-[105%] w-80 p-5 bg-slate-900 text-white text-[11px] rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,0.6)] z-[9999] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150 pointer-events-none border border-white/10">
           <div className="font-black mb-3 flex items-center text-blue-400 uppercase tracking-widest text-[9px] border-b border-white/10 pb-2">

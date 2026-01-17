@@ -71,32 +71,29 @@ const Canvas: React.FC<CanvasProps> = ({
 
         {/* Layer 1: Tables */}
         {tables.map(table => (
-          <TableCard 
-            key={table.id} table={table} 
-            groups={groups.filter(g => table.groupIds.includes(g.id))}
-            allTables={tables} allGroups={groups}
-            relationships={relationships.filter(r => r.fromTableId === table.id || r.toTableId === table.id)}
-            onMouseDown={(e) => handleMouseDown(table.id, 'table', e)}
-            onEdit={() => onEditTable(table)}
-            onDelete={() => onDeleteTable(table.id)}
-            onToggleCollapse={() => onToggleCollapse(table.id)}
-          />
+          <div key={table.id} id={`table-${table.id}`} className="absolute transition-all duration-300 rounded-2xl" style={{ left: table.position.x, top: table.position.y }}>
+            <TableCard 
+              table={table} 
+              groups={groups.filter(g => table.groupIds.includes(g.id))}
+              allTables={tables} allGroups={groups}
+              relationships={relationships.filter(r => r.fromTableId === table.id || r.toTableId === table.id)}
+              onMouseDown={(e) => handleMouseDown(table.id, 'table', e)}
+              onEdit={() => onEditTable(table)}
+              onDelete={() => onDeleteTable(table.id)}
+              onToggleCollapse={() => onToggleCollapse(table.id)}
+            />
+          </div>
         ))}
 
-        {/* Layer 2: Relationships SVG - Ensure high Z-index for visibility */}
+        {/* Layer 2: Relationships SVG */}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible z-50">
           <defs>
-            {/* MANY side: Crow's Foot fanning OUT (3 lines) towards the table boundary */}
-            {/* refX 10 means the end of the marker (the wide part) touches the table */}
             <marker id="crowfoot-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
                <path d="M 0 5 L 10 1 M 0 5 L 10 9 M 0 5 L 10 5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
             </marker>
-            {/* refX 0 means the wide part touches the table on the start side */}
             <marker id="crowfoot-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                <path d="M 10 5 L 0 1 M 10 5 L 0 9 M 10 5 L 0 5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
             </marker>
-            
-            {/* ONE side: Clean perpendicular line, now thinner */}
             <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="3" markerHeight="7" orient="auto">
                <line x1="10" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5" />
             </marker>

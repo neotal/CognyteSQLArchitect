@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Download, Upload, Search, ZoomIn, ZoomOut, Database, Users, Link as LinkIcon, Trash2, Edit2, X, RefreshCcw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Plus, Search, ZoomIn, ZoomOut, Link as LinkIcon, Table as TableIcon, Hash, ChevronRight, X } from 'lucide-react';
 import { Table, Group, Relationship, Column, RelationType } from './types';
 import Canvas from './components/Canvas';
 import Sidebar from './components/Sidebar';
@@ -23,9 +23,10 @@ const App: React.FC = () => {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [editingRelation, setEditingRelation] = useState<Relationship | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const isInitialLoadComplete = useRef(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('cognyte-sql-planner-state');
@@ -52,6 +53,44 @@ const App: React.FC = () => {
     }
   }, [tables, groups, relationships, zoom]);
 
+  // Derived search results
+  const searchResults = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    const term = searchTerm.toLowerCase();
+    const results: { type: 'table' | 'column', tableId: string, name: string, parentTable?: string }[] = [];
+
+    tables.forEach(table => {
+      if (table.name.toLowerCase().includes(term)) {
+        results.push({ type: 'table', tableId: table.id, name: table.name });
+      }
+      table.columns.forEach(col => {
+        if (col.name.toLowerCase().includes(term)) {
+          results.push({ type: 'column', tableId: table.id, name: col.name, parentTable: table.name });
+        }
+      });
+    });
+    return results.slice(0, 10); // Limit to 10 results for performance
+  }, [searchTerm, tables]);
+
+  const handleSearchResultClick = (tableId: string) => {
+    setSearchTerm('');
+    setIsSearchFocused(false);
+    
+    // 1. Ensure table is expanded
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, isCollapsed: false } : t));
+
+    // 2. Jump to table location
+    setTimeout(() => {
+      const tableEl = document.getElementById(`table-${tableId}`);
+      if (tableEl) {
+        tableEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        // Visual feedback flash
+        tableEl.classList.add('ring-offset-4', 'ring-4', 'ring-blue-500');
+        setTimeout(() => tableEl.classList.remove('ring-offset-4', 'ring-4', 'ring-blue-500'), 2000);
+      }
+    }, 100);
+  };
+
   const handleAddTable = (tableData: Partial<Table>) => {
     const targetGroupId = tableData.groupIds?.[0] || groups[0].id;
     const targetGroup = groups.find(g => g.id === targetGroupId);
@@ -73,7 +112,6 @@ const App: React.FC = () => {
       businessUnit: tableData.businessUnit || '',
     };
 
-    // Auto-linking: Scans existing tables for same column name + same type
     const newRelationships: Relationship[] = [];
     tables.forEach(existingTable => {
       existingTable.columns.forEach(existingCol => {
@@ -156,32 +194,82 @@ const App: React.FC = () => {
       />
 
       <div className="flex-1 flex flex-col relative">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-[60]">
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-[100]">
           <div className="flex items-center space-x-6">
             <h1 className="text-xl font-black bg-gradient-to-br from-slate-900 to-blue-900 bg-clip-text text-transparent">Cognyte Architect</h1>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+            <div className="relative group/search">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within/search:text-blue-500 transition-colors" />
               <input 
-                type="text" placeholder="Search tables..." 
-                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 w-64 text-sm"
-                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                type="text" placeholder="Search tables or columns..." 
+                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 w-80 text-sm transition-all shadow-sm"
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
               />
+
+              {/* Advanced Search Dropdown */}
+              {isSearchFocused && searchTerm.trim() && (
+                <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[200]">
+                  <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Search Results</span>
+                    <span className="text-[10px] font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">{searchResults.length} found</span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                    {searchResults.length > 0 ? (
+                      searchResults.map((res, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSearchResultClick(res.tableId)}
+                          className="w-full p-4 flex items-center space-x-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0 group/item"
+                        >
+                          <div className={`p-2 rounded-lg transition-colors ${res.type === 'table' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                            {res.type === 'table' ? <TableIcon className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-slate-800 text-sm truncate">{res.name}</span>
+                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${res.type === 'table' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {res.type}
+                              </span>
+                            </div>
+                            {res.type === 'column' && (
+                              <div className="text-[10px] text-slate-400 flex items-center mt-0.5">
+                                <span>belongs to</span>
+                                <span className="font-bold text-slate-500 ml-1 italic">{res.parentTable}</span>
+                              </div>
+                            )}
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover/item:text-blue-500 group-hover/item:translate-x-1 transition-all" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center">
+                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <X className="w-5 h-5 text-slate-300" />
+                        </div>
+                        <p className="text-slate-500 font-bold text-xs italic">No results found for "{searchTerm}"</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-4">
              <div className="flex bg-slate-100 p-1.5 rounded-xl space-x-1 items-center">
-               <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="p-1.5 hover:bg-white rounded-lg"><ZoomOut className="w-4 h-4" /></button>
+               <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors active:scale-95"><ZoomOut className="w-4 h-4" /></button>
                <span className="text-[10px] font-black w-10 text-center">{Math.round(zoom * 100)}%</span>
-               <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-1.5 hover:bg-white rounded-lg"><ZoomIn className="w-4 h-4" /></button>
+               <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors active:scale-95"><ZoomIn className="w-4 h-4" /></button>
              </div>
-             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
-             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
+             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-indigo-600 hover:text-white"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
+             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-black active:scale-95"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-hidden relative canvas-grid bg-slate-50">
+        <main ref={canvasContainerRef} className="flex-1 overflow-hidden relative canvas-grid bg-slate-50">
           <Canvas 
-            tables={tables.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()))}
+            tables={tables}
             groups={groups}
             relationships={relationships}
             zoom={zoom}
