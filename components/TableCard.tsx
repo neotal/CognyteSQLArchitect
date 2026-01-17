@@ -19,7 +19,7 @@ const TableCard: React.FC<TableCardProps> = memo(({
   table, groups, allTables, allGroups, relationships, onMouseDown, onEdit, onDelete, onToggleCollapse
 }) => {
   const [showStats, setShowStats] = useState<'cols' | 'rels' | 'groups' | null>(null);
-  const [isHoveringName, setIsHoveringName] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
 
   const keys = table.columns.filter(c => c.isKey);
   const regular = table.columns.filter(c => !c.isKey);
@@ -31,7 +31,6 @@ const TableCard: React.FC<TableCardProps> = memo(({
 
   const linkedTableNames = Array.from(new Set(linkedTables.map(t => t!.name)));
   const groupNames = groups.map(g => g.name);
-
   const linkedColors = Array.from(new Set(linkedTables.map(t => t!.color)));
 
   const hasMetadata = table.sourceSystem || table.businessArea || table.businessUnit;
@@ -39,7 +38,7 @@ const TableCard: React.FC<TableCardProps> = memo(({
 
   return (
     <div 
-      className={`absolute bg-white rounded-2xl shadow-xl border-2 select-none group/table overflow-visible transition-all hover:shadow-2xl`}
+      className={`absolute bg-white rounded-2xl shadow-xl border-2 select-none group/table overflow-visible transition-all ${isHovering ? 'z-[100] shadow-2xl scale-[1.01]' : 'z-20'}`}
       style={{ 
         left: table.position.x, 
         top: table.position.y, 
@@ -47,244 +46,129 @@ const TableCard: React.FC<TableCardProps> = memo(({
         borderColor: table.color,
       }}
       onMouseDown={onMouseDown}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Background accents from connected tables */}
+      {/* ENTERPRISE TOOLTIP */}
+      {isHovering && hasTooltipContent && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-[105%] w-80 p-5 bg-slate-900 text-white text-[11px] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] z-[9999] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150 pointer-events-none border border-white/10">
+          <div className="font-black mb-3 flex items-center text-blue-400 uppercase tracking-widest text-[9px] border-b border-white/10 pb-2">
+            <Info className="w-3.5 h-3.5 mr-2" /> Data Intelligence
+          </div>
+          
+          {table.description && (
+            <div className="mb-4">
+              <span className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Business Description</span>
+              <p className="leading-relaxed opacity-90 font-medium italic text-slate-200">
+                "{table.description}"
+              </p>
+            </div>
+          )}
+
+          {hasMetadata && (
+            <div className="space-y-2.5">
+              {table.sourceSystem && (
+                <div className="flex items-center bg-white/5 p-2.5 rounded-xl">
+                  <Database className="w-3.5 h-3.5 mr-2.5 text-blue-400 flex-shrink-0" />
+                  <div>
+                    <span className="block text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Source System</span>
+                    <span className="font-bold text-slate-100">{table.sourceSystem}</span>
+                  </div>
+                </div>
+              )}
+              {table.businessArea && (
+                <div className="flex items-center bg-white/5 p-2.5 rounded-xl">
+                  <Globe className="w-3.5 h-3.5 mr-2.5 text-indigo-400 flex-shrink-0" />
+                  <div>
+                    <span className="block text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Business Area</span>
+                    <span className="font-bold text-slate-100">{table.businessArea}</span>
+                  </div>
+                </div>
+              )}
+              {table.businessUnit && (
+                <div className="flex items-center bg-white/5 p-2.5 rounded-xl">
+                  <Briefcase className="w-3.5 h-3.5 mr-2.5 text-emerald-400 flex-shrink-0" />
+                  <div>
+                    <span className="block text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Business Unit</span>
+                    <span className="font-bold text-slate-100">{table.businessUnit}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 rotate-45" />
+        </div>
+      )}
+
+      {/* Background accents */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[14px]">
-        <div 
-          className="absolute inset-0 flex"
-          style={{ opacity: 0.12 }}
-        >
+        <div className="absolute inset-0 flex" style={{ opacity: 0.1 }}>
           {linkedColors.map((c, i) => (
             <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
           ))}
         </div>
       </div>
 
-      {/* Header */}
       <div 
-        className={`relative px-4 py-3 flex items-center justify-between cursor-move rounded-t-xl overflow-visible border-b`}
-        style={{ 
-          backgroundColor: `${table.color}15`, 
-          borderBottomColor: `${table.color}30` 
-        }}
+        className="relative px-4 py-3 flex items-center justify-between cursor-move rounded-t-xl border-b"
+        style={{ backgroundColor: `${table.color}10`, borderBottomColor: `${table.color}20` }}
       >
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           <button 
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggleCollapse();
-            }}
-            className="p-1 hover:bg-white rounded-md transition-colors mr-1"
-            title={table.isCollapsed ? "Expand columns" : "Collapse columns"}
+            onClick={(e) => { e.stopPropagation(); onToggleCollapse(); }}
+            className="p-1 hover:bg-white rounded-md"
           >
-            {table.isCollapsed ? <ChevronDown className="w-3.5 h-3.5 text-slate-500" /> : <ChevronUp className="w-3.5 h-3.5 text-slate-500" />}
+            {table.isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
           </button>
-          
-          <div 
-            className="flex items-center space-x-2 flex-1 min-w-0"
-            onMouseEnter={() => setIsHoveringName(true)}
-            onMouseLeave={() => setIsHoveringName(false)}
-          >
-            <TableIcon className="w-4 h-4 flex-shrink-0" style={{ color: table.color }} />
-            <h3 className="font-black text-slate-800 text-sm truncate tracking-tight">{table.name}</h3>
-            
-            {isHoveringName && hasTooltipContent && (
-              <div className="absolute left-0 bottom-full mb-3 w-72 p-5 bg-slate-900 text-white text-xs rounded-2xl shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                <div className="font-black mb-3 flex items-center text-blue-400 uppercase tracking-widest text-[9px]">
-                  <Info className="w-3.5 h-3.5 mr-2" /> Table Details
-                </div>
-                
-                {table.description && (
-                  <div className="leading-relaxed opacity-90 mb-4 border-b border-white/10 pb-4">
-                    {table.description}
-                  </div>
-                )}
-
-                {hasMetadata && (
-                  <div className="space-y-3">
-                    <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">Enterprise Context</div>
-                    {table.sourceSystem && (
-                      <div className="flex items-center bg-white/5 p-2 rounded-lg">
-                        <Database className="w-3 h-3 mr-2 text-blue-400" />
-                        <div>
-                          <span className="block text-[8px] text-slate-400 font-bold uppercase">Source System</span>
-                          <span className="font-bold text-slate-200">{table.sourceSystem}</span>
-                        </div>
-                      </div>
-                    )}
-                    {table.businessArea && (
-                      <div className="flex items-center bg-white/5 p-2 rounded-lg">
-                        <Globe className="w-3 h-3 mr-2 text-indigo-400" />
-                        <div>
-                          <span className="block text-[8px] text-slate-400 font-bold uppercase">Business Area</span>
-                          <span className="font-bold text-slate-200">{table.businessArea}</span>
-                        </div>
-                      </div>
-                    )}
-                    {table.businessUnit && (
-                      <div className="flex items-center bg-white/5 p-2 rounded-lg">
-                        <Briefcase className="w-3 h-3 mr-2 text-emerald-400" />
-                        <div>
-                          <span className="block text-[8px] text-slate-400 font-bold uppercase">Business Unit</span>
-                          <span className="font-bold text-slate-200">{table.businessUnit}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-900 rotate-45" />
-              </div>
-            )}
-          </div>
+          <TableIcon className="w-4 h-4" style={{ color: table.color }} />
+          <h3 className="font-black text-slate-800 text-sm truncate tracking-tight">{table.name}</h3>
         </div>
-        
-        <div className="flex items-center space-x-1 opacity-0 group-hover/table:opacity-100 transition-opacity ml-2">
-          <button 
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { 
-              e.preventDefault();
-              e.stopPropagation(); 
-              onEdit(); 
-            }} 
-            className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600 transition-all shadow-sm active:scale-90"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button 
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { 
-              e.preventDefault();
-              e.stopPropagation(); 
-              onDelete(); 
-            }} 
-            className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-600 transition-all shadow-sm active:scale-90"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+        <div className="flex items-center space-x-1 opacity-0 group-hover/table:opacity-100 transition-opacity">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600"><Edit2 className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       </div>
 
       {!table.isCollapsed && (
-        <>
-          {hasMetadata && (
-            <div className="px-4 py-3 bg-slate-50/50 border-b border-slate-100 space-y-2 animate-in fade-in duration-300">
-              {table.sourceSystem && (
-                <div className="flex items-center text-[9px] text-slate-500">
-                  <Database className="w-3 h-3 mr-1.5 text-blue-400" />
-                  <span className="font-black uppercase tracking-tighter mr-1">System:</span>
-                  <span className="font-bold text-slate-700 truncate">{table.sourceSystem}</span>
-                </div>
-              )}
-              {table.businessArea && (
-                <div className="flex items-center text-[9px] text-slate-500">
-                  <Globe className="w-3 h-3 mr-1.5 text-indigo-400" />
-                  <span className="font-black uppercase tracking-tighter mr-1">Area:</span>
-                  <span className="font-bold text-slate-700 truncate">{table.businessArea}</span>
-                </div>
-              )}
-              {table.businessUnit && (
-                <div className="flex items-center text-[9px] text-slate-500">
-                  <Briefcase className="w-3 h-3 mr-1.5 text-emerald-400" />
-                  <span className="font-black uppercase tracking-tighter mr-1">Unit:</span>
-                  <span className="font-bold text-slate-700 truncate">{table.businessUnit}</span>
-                </div>
-              )}
+        <div className="relative max-h-60 overflow-y-auto bg-white/50 custom-scrollbar">
+          {keys.map(col => (
+            <div key={col.id} className="px-4 py-2.5 flex items-center justify-between text-xs border-b border-slate-50 last:border-0 hover:bg-blue-50/30">
+              <div className="flex items-center min-w-0">
+                <Key className="w-3.5 h-3.5 mr-2 text-amber-500" />
+                <span className="font-bold truncate font-mono">{col.name}</span>
+              </div>
+              <span className="text-[9px] font-black text-slate-400 uppercase font-mono">{col.type}</span>
             </div>
-          )}
-
-          <div className="relative max-h-60 overflow-y-auto bg-white/40 backdrop-blur-[1px] custom-scrollbar transition-all animate-in fade-in duration-300">
-            {keys.map(col => (
-              <div key={col.id} className="px-4 py-2.5 flex items-center justify-between text-xs text-slate-800 hover:bg-amber-50/50 border-b border-slate-50 last:border-0 transition-colors">
-                <div className="flex items-center min-w-0">
-                  <Key className="w-3.5 h-3.5 mr-2.5 text-amber-500 flex-shrink-0 drop-shadow-sm" />
-                  <span className="font-bold truncate font-mono">{col.name}</span>
-                </div>
-                <span className="ml-2 text-[9px] font-black text-slate-400 uppercase tracking-tighter font-mono bg-slate-100/50 px-1.5 py-0.5 rounded">{col.type}</span>
+          ))}
+          {regular.map(col => (
+            <div key={col.id} className="px-4 py-2 flex items-center justify-between text-xs border-b border-slate-50 last:border-0 hover:bg-slate-50">
+              <div className="flex items-center min-w-0">
+                <div className="w-3.5 h-3.5 mr-2 flex items-center justify-center opacity-20"><div className="w-1 h-1 rounded-full bg-slate-900" /></div>
+                <span className="font-medium truncate font-mono">{col.name}</span>
               </div>
-            ))}
-            {regular.map(col => (
-              <div key={col.id} className="px-4 py-2 flex items-center justify-between text-xs text-slate-600 hover:bg-slate-50 border-b border-slate-50 last:border-0 transition-colors">
-                <div className="flex items-center min-w-0">
-                  <div className="w-3.5 h-3.5 mr-2.5 flex items-center justify-center flex-shrink-0">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
-                  </div>
-                  <span className="truncate font-medium font-mono">{col.name}</span>
-                </div>
-                <span className="ml-2 text-[9px] font-black text-slate-300 uppercase tracking-tighter font-mono">{col.type}</span>
-              </div>
-            ))}
-            {table.columns.length === 0 && (
-              <div className="px-4 py-4 text-center text-[10px] text-slate-400 italic">No columns defined</div>
-            )}
-          </div>
-        </>
+              <span className="text-[9px] font-black text-slate-300 uppercase font-mono">{col.type}</span>
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* Stats Bar */}
-      <div className={`relative px-3 py-2 bg-slate-50/95 flex items-center justify-around rounded-b-xl ${!table.isCollapsed ? 'border-t border-slate-100' : ''}`}>
-        <button 
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); setShowStats(showStats === 'cols' ? null : 'cols'); }}
-          className={`flex items-center px-2 py-1 rounded-lg transition-all text-[11px] font-black ${showStats === 'cols' ? 'bg-blue-100 text-blue-700' : 'text-slate-400 hover:bg-slate-200'}`}
-          title="Columns"
-        >
-          <Hash className="w-3.5 h-3.5 mr-1" /> {table.columns.length}
-        </button>
-        <button 
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); setShowStats(showStats === 'rels' ? null : 'rels'); }}
-          className={`flex items-center px-2 py-1 rounded-lg transition-all text-[11px] font-black ${showStats === 'rels' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:bg-slate-200'}`}
-          title="Relationships"
-        >
-          <Link className="w-3.5 h-3.5 mr-1" /> {relationships.length}
-        </button>
-        <button 
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); setShowStats(showStats === 'groups' ? null : 'groups'); }}
-          className={`flex items-center px-2 py-1 rounded-lg transition-all text-[11px] font-black ${showStats === 'groups' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-200'}`}
-          title="Groups"
-        >
-          <Layers className="w-3.5 h-3.5 mr-1" /> {groups.length}
-        </button>
+      <div className={`relative px-3 py-2 bg-slate-50/90 flex items-center justify-around rounded-b-xl ${!table.isCollapsed ? 'border-t border-slate-100' : ''}`}>
+        <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setShowStats(showStats === 'cols' ? null : 'cols'); }} className={`flex items-center px-2 py-1 rounded-lg text-[10px] font-black transition-colors ${showStats === 'cols' ? 'bg-blue-100 text-blue-700' : 'text-slate-400 hover:bg-slate-200'}`}><Hash className="w-3 h-3 mr-1" /> {table.columns.length}</button>
+        <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setShowStats(showStats === 'rels' ? null : 'rels'); }} className={`flex items-center px-2 py-1 rounded-lg text-[10px] font-black transition-colors ${showStats === 'rels' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-400 hover:bg-slate-200'}`}><Link className="w-3 h-3 mr-1" /> {relationships.length}</button>
+        <button onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); setShowStats(showStats === 'groups' ? null : 'groups'); }} className={`flex items-center px-2 py-1 rounded-lg text-[10px] font-black transition-colors ${showStats === 'groups' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-200'}`}><Layers className="w-3 h-3 mr-1" /> {groups.length}</button>
       </div>
 
       {showStats && (
-        <div className="absolute top-full left-0 right-0 mt-3 bg-white shadow-2xl rounded-2xl border border-slate-200 p-4 z-40 animate-in slide-in-from-top-2 duration-300">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center">
-              {showStats === 'cols' ? 'Columns List' : showStats === 'rels' ? 'Connected Tables' : 'Member Groups'}
-              <ChevronRight className="w-3 h-3 ml-1" />
-            </span>
-            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setShowStats(null)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors"><MoreVertical className="w-3.5 h-3.5 text-slate-300" /></button>
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white shadow-2xl rounded-xl border border-slate-100 p-3 z-50 animate-in slide-in-from-top-1">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">{showStats} List</span>
+            <button onMouseDown={(e) => e.stopPropagation()} onClick={() => setShowStats(null)} className="p-1 hover:bg-slate-100 rounded-md"><MoreVertical className="w-3 h-3 text-slate-300" /></button>
           </div>
-          <ul className="text-xs space-y-1.5 text-slate-700 max-h-48 overflow-y-auto custom-scrollbar p-1">
-            {showStats === 'cols' && table.columns.map(c => (
-              <li key={c.id} className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-100 font-mono text-[10px]">
-                <div className="flex items-center">
-                  {c.isKey ? <Key className="w-3 h-3 mr-2 text-amber-500" /> : <Hash className="w-3 h-3 mr-2 text-slate-300" />}
-                  <span className="font-bold">{c.name}</span>
-                </div>
-                <span className="text-[8px] opacity-40 font-black">{c.type}</span>
-              </li>
-            ))}
-            {showStats === 'rels' && (
-              linkedTableNames.length > 0 ? (
-                linkedTableNames.map((n, i) => (
-                  <li key={i} className="flex items-center bg-indigo-50/50 p-2 rounded-xl border border-indigo-100 text-indigo-700">
-                    <Link className="w-3.5 h-3.5 mr-2" />
-                    <span className="font-bold">{n}</span>
-                  </li>
-                ))
-              ) : <li className="text-center text-[10px] text-slate-400 py-2">No relationships</li>
-            )}
-            {showStats === 'groups' && groupNames.map((n, i) => (
-              <li key={i} className="flex items-center bg-emerald-50/50 p-2 rounded-xl border border-emerald-100 text-emerald-700">
-                <Layers className="w-3.5 h-3.5 mr-2" />
-                <span className="font-bold">{n}</span>
-              </li>
-            ))}
+          <ul className="text-[10px] space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+            {showStats === 'cols' && table.columns.map(c => <li key={c.id} className="p-1.5 bg-slate-50 rounded-md font-mono font-bold truncate">{c.name}</li>)}
+            {showStats === 'rels' && linkedTableNames.map((n, i) => <li key={i} className="p-1.5 bg-indigo-50 text-indigo-700 rounded-md font-bold truncate">{n}</li>)}
+            {showStats === 'groups' && groupNames.map((n, i) => <li key={i} className="p-1.5 bg-emerald-50 text-emerald-700 rounded-md font-bold truncate">{n}</li>)}
           </ul>
         </div>
       )}

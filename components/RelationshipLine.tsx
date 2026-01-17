@@ -8,11 +8,15 @@ interface RelationshipLineProps {
   relationship: Relationship;
   fromTable: Table;
   toTable: Table;
+  siblingIndex?: number;
+  totalSiblings?: number;
   onDelete: () => void;
   onEdit: () => void;
 }
 
-const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, fromTable, toTable, onDelete, onEdit }) => {
+const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ 
+  relationship, fromTable, toTable, siblingIndex = 0, totalSiblings = 1, onDelete, onEdit 
+}) => {
   const [showMenu, setShowMenu] = useState(false);
 
   const getColOffset = (table: Table, columnId: string) => {
@@ -32,13 +36,20 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, 
   const x2 = isFromLeft ? toPos.x : toPos.x + TABLE_WIDTH;
   const y2 = toPos.y + getColOffset(toTable, relationship.toColumnId);
 
+  // Calculate curvature offset for multiple relationships between the same pair
+  // This ensures lines don't overlap perfectly
   const dx = Math.abs(x1 - x2);
-  const curvature = Math.min(dx / 2, 120);
-  const cx1 = isFromLeft ? x1 + curvature : x1 - curvature;
-  const cy1 = y1;
-  const cx2 = isFromLeft ? x2 - curvature : x2 + curvature;
-  const cy2 = y2;
+  const baseCurvature = Math.min(dx / 2, 120);
+  
+  // Apply a unique vertical arc to each sibling
+  const verticalOffset = (siblingIndex - (totalSiblings - 1) / 2) * 30;
+  
+  const cx1 = isFromLeft ? x1 + baseCurvature : x1 - baseCurvature;
+  const cy1 = y1 + verticalOffset;
+  const cx2 = isFromLeft ? x2 - baseCurvature : x2 + baseCurvature;
+  const cy2 = y2 + verticalOffset;
 
+  // Mid-point calculation for label positioning
   const t = 0.5;
   const mx = (1-t)**3 * x1 + 3*(1-t)**2 * t * cx1 + 3*(1-t) * t**2 * cx2 + t**3 * x2;
   const my = (1-t)**3 * y1 + 3*(1-t)**2 * t * cy1 + 3*(1-t) * t**2 * cy2 + t**3 * y2;
@@ -50,11 +61,13 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, 
 
   return (
     <g className="group cursor-default pointer-events-auto" style={{ color: styleConfig.color }}>
+      {/* Invisible thick path for easier hovering */}
       <path 
         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
-        className="stroke-current stroke-[12px] fill-none opacity-0 group-hover:opacity-5 transition-all"
+        className="stroke-current stroke-[20px] fill-none opacity-0 group-hover:opacity-5 transition-all cursor-pointer"
       />
       
+      {/* Actual connection line */}
       <path 
         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
         className={`${styleConfig.stroke} fill-none transition-all duration-300`}
@@ -78,16 +91,18 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, 
         ) : (
           <g className="animate-in fade-in duration-200">
             <foreignObject x="0" y="0" width="50" height="30">
-               <div className="flex items-center justify-around h-full p-1">
+               <div className="flex items-center justify-around h-full p-1 bg-white rounded-xl">
                  <button 
                    onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                   className="p-1 hover:bg-slate-100 rounded-lg text-blue-500"
+                   className="p-1 hover:bg-blue-50 rounded-lg text-blue-500 transition-colors"
+                   title="Edit Connection"
                  >
                    <Edit2 className="w-3.5 h-3.5" />
                  </button>
                  <button 
-                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete connection?')) onDelete(); }}
-                   className="p-1 hover:bg-red-50 rounded-lg text-red-500"
+                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete this specific connection?')) onDelete(); }}
+                   className="p-1 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                   title="Delete Connection"
                  >
                    <Trash2 className="w-3.5 h-3.5" />
                  </button>

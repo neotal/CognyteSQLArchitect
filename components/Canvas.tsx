@@ -64,12 +64,12 @@ const Canvas: React.FC<CanvasProps> = ({
         className="absolute top-0 left-0 min-w-[5000px] min-h-[5000px] origin-top-left"
         style={{ transform: `scale(${zoom})` }}
       >
-        {/* Z-Index Layer 0: Groups */}
+        {/* Layer 0: Groups */}
         {groups.map(group => (
           <GroupArea key={group.id} group={group} onMouseDown={(e) => handleMouseDown(group.id, 'group', e)} onResize={(size) => setGroups(prev => prev.map(g => g.id === group.id ? { ...g, size } : g))} />
         ))}
 
-        {/* Z-Index Layer 1: Tables */}
+        {/* Layer 1: Tables */}
         {tables.map(table => (
           <TableCard 
             key={table.id} table={table} 
@@ -83,22 +83,22 @@ const Canvas: React.FC<CanvasProps> = ({
           />
         ))}
 
-        {/* Z-Index Layer 2: Relationships (Now on top of tables to ensure visibility) */}
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible">
+        {/* Layer 2: Relationships - CRITICAL: Higher Z-index and Fixed Markers */}
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible z-40">
           <defs>
-            {/* Many Side: Trident/Crowfoot fork */}
-            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" orient="auto">
-              <path d="M 0 0 L 10 5 L 0 10 M 0 5 L 10 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            {/* Many side: Chicken Foot / Crow's Foot pointing TOWARDS the table */}
+            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+               <path d="M 0 0 L 8 5 L 0 10 M 8 0 L 8 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </marker>
-            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
-              <path d="M 10 0 L 0 5 L 10 10 M 10 5 L 0 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+               <path d="M 10 0 L 2 5 L 10 10 M 2 0 L 2 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </marker>
-            {/* One Side: Regular Line */}
-            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="10" orient="auto">
-               <line x1="10" y1="2" x2="10" y2="8" stroke="currentColor" strokeWidth="2" />
+            {/* One side: Perpendicular line */}
+            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4" markerHeight="8" orient="auto">
+               <line x1="8" y1="1" x2="8" y2="9" stroke="currentColor" strokeWidth="2" />
             </marker>
-            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="10" orient="auto-start-reverse">
-               <line x1="0" y1="2" x2="0" y2="8" stroke="currentColor" strokeWidth="2" />
+            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="4" markerHeight="8" orient="auto-start-reverse">
+               <line x1="2" y1="1" x2="2" y2="9" stroke="currentColor" strokeWidth="2" />
             </marker>
           </defs>
 
@@ -106,10 +106,21 @@ const Canvas: React.FC<CanvasProps> = ({
             const fromT = tables.find(t => t.id === rel.fromTableId);
             const toT = tables.find(t => t.id === rel.toTableId);
             if (!fromT || !toT) return null;
+
+            const samePairRels = relationships.filter(r => 
+              (r.fromTableId === rel.fromTableId && r.toTableId === rel.toTableId) ||
+              (r.fromTableId === rel.toTableId && r.toTableId === rel.fromTableId)
+            );
+            const siblingIndex = samePairRels.findIndex(r => r.id === rel.id);
+
             return (
               <RelationshipLine 
-                key={rel.id} relationship={rel} 
-                fromTable={fromT} toTable={toT}
+                key={rel.id} 
+                relationship={rel} 
+                fromTable={fromT} 
+                toTable={toT}
+                siblingIndex={siblingIndex}
+                totalSiblings={samePairRels.length}
                 onDelete={() => onDeleteRelation(rel.id)}
                 onEdit={() => onEditRelation(rel)}
               />
