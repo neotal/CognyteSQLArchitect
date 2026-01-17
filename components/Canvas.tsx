@@ -83,22 +83,25 @@ const Canvas: React.FC<CanvasProps> = ({
           />
         ))}
 
-        {/* Layer 2: Relationships - CRITICAL: Higher Z-index and Fixed Markers */}
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible z-40">
+        {/* Layer 2: Relationships SVG - Ensure high Z-index for visibility */}
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible z-50">
           <defs>
-            {/* Many side: Chicken Foot / Crow's Foot pointing TOWARDS the table */}
-            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-               <path d="M 0 0 L 8 5 L 0 10 M 8 0 L 8 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            {/* MANY side: Crow's Foot fanning OUT (3 lines) towards the table boundary */}
+            {/* refX 10 means the end of the marker (the wide part) touches the table */}
+            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+               <path d="M 0 5 L 10 1 M 0 5 L 10 9 M 0 5 L 10 5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
             </marker>
-            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-               <path d="M 10 0 L 2 5 L 10 10 M 2 0 L 2 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            {/* refX 0 means the wide part touches the table on the start side */}
+            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+               <path d="M 10 5 L 0 1 M 10 5 L 0 9 M 10 5 L 0 5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
             </marker>
-            {/* One side: Perpendicular line */}
-            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="4" markerHeight="8" orient="auto">
-               <line x1="8" y1="1" x2="8" y2="9" stroke="currentColor" strokeWidth="2" />
+            
+            {/* ONE side: Clean perpendicular line, now thinner */}
+            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="3" markerHeight="7" orient="auto">
+               <line x1="10" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5" />
             </marker>
-            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="4" markerHeight="8" orient="auto-start-reverse">
-               <line x1="2" y1="1" x2="2" y2="9" stroke="currentColor" strokeWidth="2" />
+            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="3" markerHeight="7" orient="auto-start-reverse">
+               <line x1="0" y1="0" x2="0" y2="10" stroke="currentColor" strokeWidth="1.5" />
             </marker>
           </defs>
 

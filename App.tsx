@@ -156,7 +156,7 @@ const App: React.FC = () => {
       />
 
       <div className="flex-1 flex flex-col relative">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-50">
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-[60]">
           <div className="flex items-center space-x-6">
             <h1 className="text-xl font-black bg-gradient-to-br from-slate-900 to-blue-900 bg-clip-text text-transparent">Cognyte Architect</h1>
             <div className="relative">

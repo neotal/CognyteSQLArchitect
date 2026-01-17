@@ -49,16 +49,16 @@ const TableCard: React.FC<TableCardProps> = memo(({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* ENTERPRISE TOOLTIP */}
+      {/* ENTERPRISE TOOLTIP - Visible on entire card surface hover */}
       {isHovering && hasTooltipContent && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-[105%] w-80 p-5 bg-slate-900 text-white text-[11px] rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.5)] z-[9999] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150 pointer-events-none border border-white/10">
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-[105%] w-80 p-5 bg-slate-900 text-white text-[11px] rounded-2xl shadow-[0_30px_80px_rgba(0,0,0,0.6)] z-[9999] animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-150 pointer-events-none border border-white/10">
           <div className="font-black mb-3 flex items-center text-blue-400 uppercase tracking-widest text-[9px] border-b border-white/10 pb-2">
             <Info className="w-3.5 h-3.5 mr-2" /> Data Intelligence
           </div>
           
           {table.description && (
             <div className="mb-4">
-              <span className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Business Description</span>
+              <span className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5 leading-none">Business Description</span>
               <p className="leading-relaxed opacity-90 font-medium italic text-slate-200">
                 "{table.description}"
               </p>
@@ -68,41 +68,40 @@ const TableCard: React.FC<TableCardProps> = memo(({
           {hasMetadata && (
             <div className="space-y-2.5">
               {table.sourceSystem && (
-                <div className="flex items-center bg-white/5 p-2.5 rounded-xl">
-                  <Database className="w-3.5 h-3.5 mr-2.5 text-blue-400 flex-shrink-0" />
+                <div className="flex items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                  <Database className="w-3.5 h-3.5 mr-3 text-blue-400 flex-shrink-0" />
                   <div>
                     <span className="block text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Source System</span>
-                    <span className="font-bold text-slate-100">{table.sourceSystem}</span>
+                    <span className="font-bold text-slate-100 text-[11px]">{table.sourceSystem}</span>
                   </div>
                 </div>
               )}
               {table.businessArea && (
-                <div className="flex items-center bg-white/5 p-2.5 rounded-xl">
-                  <Globe className="w-3.5 h-3.5 mr-2.5 text-indigo-400 flex-shrink-0" />
+                <div className="flex items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                  <Globe className="w-3.5 h-3.5 mr-3 text-indigo-400 flex-shrink-0" />
                   <div>
                     <span className="block text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Business Area</span>
-                    <span className="font-bold text-slate-100">{table.businessArea}</span>
+                    <span className="font-bold text-slate-100 text-[11px]">{table.businessArea}</span>
                   </div>
                 </div>
               )}
               {table.businessUnit && (
-                <div className="flex items-center bg-white/5 p-2.5 rounded-xl">
-                  <Briefcase className="w-3.5 h-3.5 mr-2.5 text-emerald-400 flex-shrink-0" />
+                <div className="flex items-center bg-white/5 p-3 rounded-xl border border-white/5">
+                  <Briefcase className="w-3.5 h-3.5 mr-3 text-emerald-400 flex-shrink-0" />
                   <div>
                     <span className="block text-[8px] text-slate-400 font-black uppercase tracking-widest leading-none mb-1">Business Unit</span>
-                    <span className="font-bold text-slate-100">{table.businessUnit}</span>
+                    <span className="font-bold text-slate-100 text-[11px]">{table.businessUnit}</span>
                   </div>
                 </div>
               )}
             </div>
           )}
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 rotate-45" />
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-900 rotate-45 border-r border-b border-white/10" />
         </div>
       )}
 
-      {/* Background accents */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[14px]">
-        <div className="absolute inset-0 flex" style={{ opacity: 0.1 }}>
+        <div className="absolute inset-0 flex opacity-10">
           {linkedColors.map((c, i) => (
             <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
           ))}
@@ -111,40 +110,40 @@ const TableCard: React.FC<TableCardProps> = memo(({
 
       <div 
         className="relative px-4 py-3 flex items-center justify-between cursor-move rounded-t-xl border-b"
-        style={{ backgroundColor: `${table.color}10`, borderBottomColor: `${table.color}20` }}
+        style={{ backgroundColor: `${table.color}15`, borderBottomColor: `${table.color}30` }}
       >
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           <button 
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggleCollapse(); }}
-            className="p-1 hover:bg-white rounded-md"
+            className="p-1 hover:bg-white rounded-md transition-colors"
           >
             {table.isCollapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
           </button>
-          <TableIcon className="w-4 h-4" style={{ color: table.color }} />
+          <TableIcon className="w-4 h-4 flex-shrink-0" style={{ color: table.color }} />
           <h3 className="font-black text-slate-800 text-sm truncate tracking-tight">{table.name}</h3>
         </div>
         <div className="flex items-center space-x-1 opacity-0 group-hover/table:opacity-100 transition-opacity">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600"><Edit2 className="w-3.5 h-3.5" /></button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600 transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-600 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       </div>
 
       {!table.isCollapsed && (
         <div className="relative max-h-60 overflow-y-auto bg-white/50 custom-scrollbar">
           {keys.map(col => (
-            <div key={col.id} className="px-4 py-2.5 flex items-center justify-between text-xs border-b border-slate-50 last:border-0 hover:bg-blue-50/30">
+            <div key={col.id} className="px-4 py-2.5 flex items-center justify-between text-xs border-b border-slate-50 last:border-0 hover:bg-amber-50/40">
               <div className="flex items-center min-w-0">
-                <Key className="w-3.5 h-3.5 mr-2 text-amber-500" />
+                <Key className="w-3.5 h-3.5 mr-2 text-amber-500 flex-shrink-0" />
                 <span className="font-bold truncate font-mono">{col.name}</span>
               </div>
-              <span className="text-[9px] font-black text-slate-400 uppercase font-mono">{col.type}</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase font-mono px-1.5 bg-slate-100 rounded">{col.type}</span>
             </div>
           ))}
           {regular.map(col => (
             <div key={col.id} className="px-4 py-2 flex items-center justify-between text-xs border-b border-slate-50 last:border-0 hover:bg-slate-50">
               <div className="flex items-center min-w-0">
-                <div className="w-3.5 h-3.5 mr-2 flex items-center justify-center opacity-20"><div className="w-1 h-1 rounded-full bg-slate-900" /></div>
+                <div className="w-3.5 h-3.5 mr-2 flex items-center justify-center opacity-30"><div className="w-1.5 h-1.5 rounded-full bg-slate-900" /></div>
                 <span className="font-medium truncate font-mono">{col.name}</span>
               </div>
               <span className="text-[9px] font-black text-slate-300 uppercase font-mono">{col.type}</span>

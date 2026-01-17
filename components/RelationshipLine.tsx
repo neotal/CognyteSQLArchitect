@@ -36,12 +36,9 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({
   const x2 = isFromLeft ? toPos.x : toPos.x + TABLE_WIDTH;
   const y2 = toPos.y + getColOffset(toTable, relationship.toColumnId);
 
-  // Calculate curvature offset for multiple relationships between the same pair
-  // This ensures lines don't overlap perfectly
   const dx = Math.abs(x1 - x2);
   const baseCurvature = Math.min(dx / 2, 120);
   
-  // Apply a unique vertical arc to each sibling
   const verticalOffset = (siblingIndex - (totalSiblings - 1) / 2) * 30;
   
   const cx1 = isFromLeft ? x1 + baseCurvature : x1 - baseCurvature;
@@ -49,25 +46,30 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({
   const cx2 = isFromLeft ? x2 - baseCurvature : x2 + baseCurvature;
   const cy2 = y2 + verticalOffset;
 
-  // Mid-point calculation for label positioning
   const t = 0.5;
   const mx = (1-t)**3 * x1 + 3*(1-t)**2 * t * cx1 + 3*(1-t) * t**2 * cx2 + t**3 * x2;
   const my = (1-t)**3 * y1 + 3*(1-t)**2 * t * cy1 + 3*(1-t) * t**2 * cy2 + t**3 * y2;
 
   const styleConfig = RELATION_STYLES[relationship.type] || { color: '#94a3b8', stroke: 'stroke-slate-300 stroke-2' };
   
-  const markerStart = (relationship.type === 'N:1' || relationship.type === 'N:N') ? 'url(#crowfoot-start)' : 'url(#one-start)';
-  const markerEnd = (relationship.type === '1:N' || relationship.type === 'N:N') ? 'url(#crowfoot-end)' : 'url(#one-end)';
+  // Logical mapping of relationship types to SVG markers
+  // Start marker (From side)
+  const markerStart = (relationship.type === 'N:1' || relationship.type === 'N:N') 
+    ? 'url(#crowfoot-start)' 
+    : 'url(#one-start)';
+
+  // End marker (To side)
+  const markerEnd = (relationship.type === '1:N' || relationship.type === 'N:N') 
+    ? 'url(#crowfoot-end)' 
+    : 'url(#one-end)';
 
   return (
     <g className="group cursor-default pointer-events-auto" style={{ color: styleConfig.color }}>
-      {/* Invisible thick path for easier hovering */}
       <path 
         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
         className="stroke-current stroke-[20px] fill-none opacity-0 group-hover:opacity-5 transition-all cursor-pointer"
       />
       
-      {/* Actual connection line */}
       <path 
         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
         className={`${styleConfig.stroke} fill-none transition-all duration-300`}
@@ -76,7 +78,6 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({
         style={{ stroke: 'currentColor' }}
       />
 
-      {/* Interactive Label Container */}
       <g 
         transform={`translate(${mx - 25}, ${my - 15})`} 
         onMouseEnter={() => setShowMenu(true)}
@@ -100,7 +101,7 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({
                    <Edit2 className="w-3.5 h-3.5" />
                  </button>
                  <button 
-                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete this specific connection?')) onDelete(); }}
+                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete connection?')) onDelete(); }}
                    className="p-1 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
                    title="Delete Connection"
                  >
