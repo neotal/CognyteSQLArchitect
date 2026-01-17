@@ -7,9 +7,9 @@ export const TABLE_WIDTH = 240;
 export const TABLE_HEADER_HEIGHT = 48;
 export const COLUMN_HEIGHT = 32;
 
-export const RELATION_STYLES: Record<string, string> = {
-  '1:1': 'stroke-blue-500 stroke-2',
-  '1:N': 'stroke-indigo-500 stroke-[3]',
-  'N:1': 'stroke-purple-500 stroke-[3]',
-  'N:N': 'stroke-pink-600 stroke-[4] stroke-dash-2'
+export const RELATION_STYLES: Record<string, { color: string, stroke: string }> = {
+  '1:1': { color: '#3b82f6', stroke: 'stroke-blue-500 stroke-2' },
+  '1:N': { color: '#10b981', stroke: 'stroke-emerald-500 stroke-2' },
+  'N:1': { color: '#8b5cf6', stroke: 'stroke-indigo-500 stroke-2' },
+  'N:N': { color: '#f43f5e', stroke: 'stroke-rose-500 stroke-2' }
 };

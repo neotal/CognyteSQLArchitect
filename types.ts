@@ -35,7 +35,9 @@ export interface Table {
 export interface Relationship {
   id: string;
   fromTableId: string;
+  fromColumnId: string;
   toTableId: string;
+  toColumnId: string;
   type: RelationType;
 }
 

@@ -13,13 +13,14 @@ interface CanvasProps {
   setTables: React.Dispatch<React.SetStateAction<Table[]>>;
   setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
   onEditTable: (table: Table) => void;
+  onEditRelation: (rel: Relationship) => void;
   onDeleteTable: (id: string) => void;
   onDeleteRelation: (id: string) => void;
   onToggleCollapse: (id: string) => void;
 }
 
 const Canvas: React.FC<CanvasProps> = ({ 
-  tables, groups, relationships, zoom, setTables, setGroups, onEditTable, onDeleteTable, onDeleteRelation, onToggleCollapse
+  tables, groups, relationships, zoom, setTables, setGroups, onEditTable, onEditRelation, onDeleteTable, onDeleteRelation, onToggleCollapse
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [draggingEntity, setDraggingEntity] = useState<{ id: string, type: 'table' | 'group' } | null>(null);
@@ -29,48 +30,27 @@ const Canvas: React.FC<CanvasProps> = ({
     e.stopPropagation();
     const entity = type === 'table' ? tables.find(t => t.id === id) : groups.find(g => g.id === id);
     if (!entity) return;
-    
     setDraggingEntity({ id, type });
-    setOffset({
-      x: e.clientX / zoom - entity.position.x,
-      y: e.clientY / zoom - entity.position.y
-    });
+    setOffset({ x: e.clientX / zoom - entity.position.x, y: e.clientY / zoom - entity.position.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggingEntity) return;
-
     const newX = e.clientX / zoom - offset.x;
     const newY = e.clientY / zoom - offset.y;
-
     if (draggingEntity.type === 'table') {
       setTables(prev => prev.map(t => t.id === draggingEntity.id ? { ...t, position: { x: newX, y: newY } } : t));
     } else {
       const group = groups.find(g => g.id === draggingEntity.id);
       if (!group) return;
-
       const dx = newX - group.position.x;
       const dy = newY - group.position.y;
-
       setGroups(prev => prev.map(g => g.id === draggingEntity.id ? { ...g, position: { x: newX, y: newY } } : g));
-      
-      setTables(prev => prev.map(t => {
-        const belongsToThisGroup = t.groupIds[0] === draggingEntity.id;
-        if (belongsToThisGroup) {
-          return { ...t, position: { x: t.position.x + dx, y: t.position.y + dy } };
-        }
-        return t;
-      }));
+      setTables(prev => prev.map(t => t.groupIds[0] === draggingEntity.id ? { ...t, position: { x: t.position.x + dx, y: t.position.y + dy } } : t));
     }
   };
 
-  const handleMouseUp = () => {
-    setDraggingEntity(null);
-  };
-
-  const handleResizeGroup = (id: string, size: { width: number, height: number }) => {
-    setGroups(prev => prev.map(g => g.id === id ? { ...g, size } : g));
-  };
+  const handleMouseUp = () => setDraggingEntity(null);
 
   return (
     <div 
@@ -84,42 +64,17 @@ const Canvas: React.FC<CanvasProps> = ({
         className="absolute top-0 left-0 min-w-[5000px] min-h-[5000px] origin-top-left"
         style={{ transform: `scale(${zoom})` }}
       >
-        {/* Groups layer (Bottom) */}
+        {/* Z-Index Layer 0: Groups */}
         {groups.map(group => (
-          <GroupArea 
-            key={group.id}
-            group={group}
-            onMouseDown={(e) => handleMouseDown(group.id, 'group', e)}
-            onResize={(size) => handleResizeGroup(group.id, size)}
-          />
+          <GroupArea key={group.id} group={group} onMouseDown={(e) => handleMouseDown(group.id, 'group', e)} onResize={(size) => setGroups(prev => prev.map(g => g.id === group.id ? { ...g, size } : g))} />
         ))}
 
-        {/* Relationships layer (Middle) */}
-        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
-          {relationships.map(rel => {
-            const fromTable = tables.find(t => t.id === rel.fromTableId);
-            const toTable = tables.find(t => t.id === rel.toTableId);
-            if (!fromTable || !toTable) return null;
-            return (
-              <RelationshipLine 
-                key={rel.id} 
-                relationship={rel}
-                fromPos={fromTable.position}
-                toPos={toTable.position}
-                onDelete={() => onDeleteRelation(rel.id)}
-              />
-            );
-          })}
-        </svg>
-
-        {/* Tables layer (Top) */}
+        {/* Z-Index Layer 1: Tables */}
         {tables.map(table => (
           <TableCard 
-            key={table.id}
-            table={table}
+            key={table.id} table={table} 
             groups={groups.filter(g => table.groupIds.includes(g.id))}
-            allTables={tables}
-            allGroups={groups}
+            allTables={tables} allGroups={groups}
             relationships={relationships.filter(r => r.fromTableId === table.id || r.toTableId === table.id)}
             onMouseDown={(e) => handleMouseDown(table.id, 'table', e)}
             onEdit={() => onEditTable(table)}
@@ -127,6 +82,40 @@ const Canvas: React.FC<CanvasProps> = ({
             onToggleCollapse={() => onToggleCollapse(table.id)}
           />
         ))}
+
+        {/* Z-Index Layer 2: Relationships (Now on top of tables to ensure visibility) */}
+        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible">
+          <defs>
+            {/* Many Side: Trident/Crowfoot fork */}
+            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 M 0 5 L 10 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </marker>
+            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+              <path d="M 10 0 L 0 5 L 10 10 M 10 5 L 0 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </marker>
+            {/* One Side: Regular Line */}
+            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="10" orient="auto">
+               <line x1="10" y1="2" x2="10" y2="8" stroke="currentColor" strokeWidth="2" />
+            </marker>
+            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="10" orient="auto-start-reverse">
+               <line x1="0" y1="2" x2="0" y2="8" stroke="currentColor" strokeWidth="2" />
+            </marker>
+          </defs>
+
+          {relationships.map(rel => {
+            const fromT = tables.find(t => t.id === rel.fromTableId);
+            const toT = tables.find(t => t.id === rel.toTableId);
+            if (!fromT || !toT) return null;
+            return (
+              <RelationshipLine 
+                key={rel.id} relationship={rel} 
+                fromTable={fromT} toTable={toT}
+                onDelete={() => onDeleteRelation(rel.id)}
+                onEdit={() => onEditRelation(rel)}
+              />
+            );
+          })}
+        </svg>
       </div>
     </div>
   );

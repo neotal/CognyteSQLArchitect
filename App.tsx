@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [editingRelation, setEditingRelation] = useState<Relationship | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   const isInitialLoadComplete = useRef(false);
@@ -71,25 +72,6 @@ const App: React.FC = () => {
     } as Table;
 
     setTables(prev => [...prev, newTable]);
-
-    const autoRelations: Relationship[] = [];
-    tables.forEach(existing => {
-      const hasMatchingColumn = existing.columns.some(ec => 
-        newTable.columns.some(nc => nc.name.toLowerCase() === ec.name.toLowerCase() && nc.name.trim() !== "")
-      );
-      if (hasMatchingColumn) {
-        autoRelations.push({
-          id: crypto.randomUUID(),
-          fromTableId: newTable.id,
-          toTableId: existing.id,
-          type: '1:1'
-        });
-      }
-    });
-    if (autoRelations.length > 0) {
-      setRelationships(prev => [...prev, ...autoRelations]);
-    }
-
     setIsTableModalOpen(false);
     setEditingTable(null);
   };
@@ -98,12 +80,9 @@ const App: React.FC = () => {
     setTables(prev => {
       const oldTable = prev.find(t => t.id === updatedTable.id);
       let finalTable = { ...updatedTable };
-
-      // If the primary group changed, move the table to the new group's area
       if (oldTable && oldTable.groupIds[0] !== updatedTable.groupIds[0]) {
         const newGroupId = updatedTable.groupIds[0];
         const targetGroup = groups.find(g => g.id === newGroupId);
-        
         if (targetGroup) {
           finalTable.position = {
             x: targetGroup.position.x + 60 + (Math.random() * 40),
@@ -111,7 +90,6 @@ const App: React.FC = () => {
           };
         }
       }
-
       return prev.map(t => t.id === updatedTable.id ? finalTable : t);
     });
     setIsTableModalOpen(false);
@@ -137,66 +115,45 @@ const App: React.FC = () => {
       position: { x: Math.random() * 300 + 100, y: Math.random() * 300 + 100 },
       size: { width: 400, height: 400 }
     };
-    
-    if (groups.some(g => g.name.toLowerCase() === newGroup.name.toLowerCase())) {
-      alert("A group with this name already exists.");
-      return;
-    }
-    
     setGroups(prev => [...prev, newGroup]);
     setIsGroupModalOpen(false);
   };
 
   const handleUpdateGroup = (group: Group) => {
-    const isDuplicateName = groups.some(g => g.id !== group.id && g.name.toLowerCase() === group.name.toLowerCase());
-    if (isDuplicateName) {
-      alert("This group name is already taken.");
-      return;
-    }
     setGroups(prev => prev.map(g => g.id === group.id ? group : g));
     setIsGroupModalOpen(false);
     setEditingGroup(null);
   };
 
   const handleDeleteGroup = (id: string) => {
-    if (groups.length <= 1) {
-      alert("The project must have at least one group.");
-      return;
-    }
-
+    if (groups.length <= 1) return alert("The project must have at least one group.");
     const tablesInGroup = tables.filter(t => t.groupIds.includes(id));
-    if (tablesInGroup.length > 0) {
-      alert(`Cannot delete this group because it contains ${tablesInGroup.length} tables. Please move or delete them first.`);
-      return;
-    }
-    
-    if (window.confirm("Delete this empty group?")) {
-      setGroups(prev => prev.filter(g => g.id !== id));
-    }
+    if (tablesInGroup.length > 0) return alert(`Cannot delete this group because it contains ${tablesInGroup.length} tables.`);
+    if (window.confirm("Delete this empty group?")) setGroups(prev => prev.filter(g => g.id !== id));
   };
 
-  const handleAddRelationship = (fromId: string, toId: string, type: RelationType) => {
-    const newRel: Relationship = {
-      id: crypto.randomUUID(),
-      fromTableId: fromId,
-      toTableId: toId,
-      type
-    };
-    setRelationships(prev => [...prev, newRel]);
+  const handleSaveRelationship = (fromTableId: string, fromColumnId: string, toTableId: string, toColumnId: string, type: RelationType) => {
+    if (editingRelation) {
+      setRelationships(prev => prev.map(r => r.id === editingRelation.id ? {
+        ...r, fromTableId, fromColumnId, toTableId, toColumnId, type
+      } : r));
+    } else {
+      const newRel: Relationship = {
+        id: crypto.randomUUID(),
+        fromTableId,
+        fromColumnId,
+        toTableId,
+        toColumnId,
+        type
+      };
+      setRelationships(prev => [...prev, newRel]);
+    }
     setIsRelationModalOpen(false);
+    setEditingRelation(null);
   };
 
   const handleDeleteRelation = (id: string) => {
     setRelationships(prev => prev.filter(r => r.id !== id));
-  };
-
-  const handleReset = () => {
-    if (window.confirm("This will clear all tables and groups! Continue?")) {
-      setTables([]);
-      setRelationships([]);
-      setGroups([{ id: 'default', name: 'Main Project', color: '#3b82f6', position: { x: 50, y: 50 }, size: { width: 600, height: 500 } }]);
-      localStorage.removeItem('cognyte-sql-planner-state');
-    }
   };
 
   const handleExportJSON = () => {
@@ -212,7 +169,6 @@ const App: React.FC = () => {
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -220,10 +176,7 @@ const App: React.FC = () => {
         if (json.tables) setTables(json.tables);
         if (json.groups) setGroups(json.groups);
         if (json.relationships) setRelationships(json.relationships);
-        alert("Design imported successfully!");
-      } catch (err) {
-        alert("Error loading file. Please ensure it is a valid JSON design.");
-      }
+      } catch (err) { alert("Error loading file."); }
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -239,23 +192,18 @@ const App: React.FC = () => {
       />
 
       <div className="flex-1 flex flex-col relative">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-30 shadow-sm backdrop-blur-md bg-white/90">
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-30 shadow-sm">
           <div className="flex items-center space-x-6">
             <div className="flex flex-col">
-              <h1 className="text-xl font-black bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent leading-none">
-                Cognyte
-              </h1>
-              <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1 text-left">SQL Architect</span>
+              <h1 className="text-xl font-black bg-gradient-to-br from-slate-900 to-indigo-900 bg-clip-text text-transparent leading-none">Cognyte</h1>
+              <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mt-1">SQL Architect</span>
             </div>
-            
-            <div className="h-10 w-[1px] bg-slate-100"></div>
-            
             <div className="relative group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
               <input 
                 type="text" 
-                placeholder="Search tables or columns..." 
-                className="pl-11 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50/50 focus:border-blue-400 focus:bg-white outline-none w-72 transition-all text-sm font-bold"
+                placeholder="Search tables..." 
+                className="pl-11 pr-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-400 outline-none w-72 transition-all text-sm font-bold"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -263,48 +211,24 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl space-x-1">
-               <input 
-                 type="file" 
-                 ref={fileInputRef} 
-                 onChange={handleImportJSON} 
-                 className="hidden" 
-                 accept=".json"
-               />
-               <button 
-                 onClick={() => fileInputRef.current?.click()} 
-                 title="Import Design" 
-                 className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-blue-600 transition-all shadow-none hover:shadow-sm"
-               >
-                 <Upload className="w-4.5 h-4.5" />
-               </button>
-               <button 
-                 onClick={handleExportJSON} 
-                 title="Export Design" 
-                 className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-indigo-600 transition-all shadow-none hover:shadow-sm"
-               >
-                 <Download className="w-4.5 h-4.5" />
-               </button>
-               <button 
-                 onClick={handleReset} 
-                 title="Clear All Data" 
-                 className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-red-500 transition-all shadow-none hover:shadow-sm"
-               >
-                 <RefreshCcw className="w-4.5 h-4.5" />
-               </button>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl space-x-1 items-center">
+               <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="p-2 hover:bg-white rounded-xl text-slate-500"><ZoomOut className="w-4 h-4" /></button>
+               <span className="text-[10px] font-black w-10 text-center text-slate-600">{Math.round(zoom * 100)}%</span>
+               <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-2 hover:bg-white rounded-xl text-slate-500"><ZoomIn className="w-4 h-4" /></button>
+               <div className="w-px h-4 bg-slate-300 mx-2" />
+               <input type="file" ref={fileInputRef} onChange={handleImportJSON} className="hidden" accept=".json" />
+               <button onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-blue-600"><Upload className="w-4.5 h-4.5" /></button>
+               <button onClick={handleExportJSON} className="p-2 hover:bg-white rounded-xl text-slate-500 hover:text-indigo-600"><Download className="w-4.5 h-4.5" /></button>
             </div>
-            
-            <div className="h-8 w-[1px] bg-slate-100 mx-1"></div>
-            
             <button 
-              onClick={() => setIsRelationModalOpen(true)}
+              onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }}
               className="flex items-center px-6 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm"
             >
-              <LinkIcon className="w-3.5 h-3.5 mr-2" /> Link Tables
+              <LinkIcon className="w-3.5 h-3.5 mr-2" /> New Connection
             </button>
             <button 
               onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }}
-              className="flex items-center px-6 py-2.5 bg-slate-900 text-white hover:bg-black rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-200 transition-all"
+              className="flex items-center px-6 py-2.5 bg-slate-900 text-white hover:bg-black rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all"
             >
               <Plus className="w-4 h-4 mr-2" /> Add Table
             </button>
@@ -313,23 +237,18 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-hidden relative canvas-grid bg-slate-50/50">
           <Canvas 
-            tables={tables.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.columns.some(c => c.name.toLowerCase().includes(searchTerm.toLowerCase())))}
+            tables={tables.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()))}
             groups={groups}
             relationships={relationships}
             zoom={zoom}
             setTables={setTables}
             setGroups={setGroups}
             onEditTable={(t) => { setEditingTable(t); setIsTableModalOpen(true); }}
+            onEditRelation={(r) => { setEditingRelation(r); setIsRelationModalOpen(true); }}
             onDeleteTable={handleDeleteTable}
             onDeleteRelation={handleDeleteRelation}
             onToggleCollapse={toggleTableCollapse}
           />
-
-          <div className="absolute bottom-10 right-10 flex flex-col space-y-3 bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 p-2 z-30">
-            <button onClick={() => setZoom(z => Math.min(z + 0.1, 2))} className="p-3 bg-white hover:bg-blue-600 hover:text-white rounded-xl text-slate-600 transition-all shadow-sm active:scale-95"><ZoomIn className="w-5 h-5" /></button>
-            <div className="text-center text-[10px] font-black text-slate-400 select-none py-1 border-y border-slate-100">{Math.round(zoom * 100)}%</div>
-            <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} className="p-3 bg-white hover:bg-blue-600 hover:text-white rounded-xl text-slate-600 transition-all shadow-sm active:scale-90"><ZoomOut className="w-5 h-5" /></button>
-          </div>
         </main>
       </div>
 
@@ -352,7 +271,8 @@ const App: React.FC = () => {
       {isRelationModalOpen && (
         <RelationModal 
           tables={tables}
-          onSave={handleAddRelationship}
+          initialData={editingRelation}
+          onSave={handleSaveRelationship}
           onClose={() => setIsRelationModalOpen(false)}
         />
       )}

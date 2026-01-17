@@ -1,24 +1,36 @@
 
-import React, { memo } from 'react';
-import { Relationship } from '../types';
-import { RELATION_STYLES } from '../constants';
+import React, { memo, useState } from 'react';
+import { Relationship, Table } from '../types';
+import { RELATION_STYLES, TABLE_WIDTH, TABLE_HEADER_HEIGHT, COLUMN_HEIGHT } from '../constants';
+import { Edit2, Trash2 } from 'lucide-react';
 
 interface RelationshipLineProps {
   relationship: Relationship;
-  fromPos: { x: number; y: number };
-  toPos: { x: number; y: number };
+  fromTable: Table;
+  toTable: Table;
   onDelete: () => void;
+  onEdit: () => void;
 }
 
-const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, fromPos, toPos, onDelete }) => {
-  const WIDTH = 240;
-  
+const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, fromTable, toTable, onDelete, onEdit }) => {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const getColOffset = (table: Table, columnId: string) => {
+    if (table.isCollapsed) return TABLE_HEADER_HEIGHT / 2;
+    const index = table.columns.findIndex(c => c.id === columnId);
+    if (index === -1) return TABLE_HEADER_HEIGHT / 2;
+    return TABLE_HEADER_HEIGHT + (index * COLUMN_HEIGHT) + (COLUMN_HEIGHT / 2);
+  };
+
+  const fromPos = fromTable.position;
+  const toPos = toTable.position;
+
   const isFromLeft = fromPos.x < toPos.x;
   
-  const x1 = isFromLeft ? fromPos.x + WIDTH : fromPos.x;
-  const y1 = fromPos.y + 40;
-  const x2 = isFromLeft ? toPos.x : toPos.x + WIDTH;
-  const y2 = toPos.y + 40;
+  const x1 = isFromLeft ? fromPos.x + TABLE_WIDTH : fromPos.x;
+  const y1 = fromPos.y + getColOffset(fromTable, relationship.fromColumnId);
+  const x2 = isFromLeft ? toPos.x : toPos.x + TABLE_WIDTH;
+  const y2 = toPos.y + getColOffset(toTable, relationship.toColumnId);
 
   const dx = Math.abs(x1 - x2);
   const curvature = Math.min(dx / 2, 120);
@@ -31,45 +43,59 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({ relationship, 
   const mx = (1-t)**3 * x1 + 3*(1-t)**2 * t * cx1 + 3*(1-t) * t**2 * cx2 + t**3 * x2;
   const my = (1-t)**3 * y1 + 3*(1-t)**2 * t * cy1 + 3*(1-t) * t**2 * cy2 + t**3 * y2;
 
-  const styleClass = RELATION_STYLES[relationship.type] || 'stroke-slate-300 stroke-2';
+  const styleConfig = RELATION_STYLES[relationship.type] || { color: '#94a3b8', stroke: 'stroke-slate-300 stroke-2' };
+  
+  const markerStart = (relationship.type === 'N:1' || relationship.type === 'N:N') ? 'url(#crowfoot-start)' : 'url(#one-start)';
+  const markerEnd = (relationship.type === '1:N' || relationship.type === 'N:N') ? 'url(#crowfoot-end)' : 'url(#one-end)';
 
   return (
-    <g className="group cursor-default pointer-events-auto">
+    <g className="group cursor-default pointer-events-auto" style={{ color: styleConfig.color }}>
       <path 
         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
-        className="stroke-blue-400 stroke-[8px] fill-none opacity-0 group-hover:opacity-10 transition-all duration-500"
+        className="stroke-current stroke-[12px] fill-none opacity-0 group-hover:opacity-5 transition-all"
       />
       
       <path 
         d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
-        className={`${styleClass} fill-none opacity-40 group-hover:opacity-100 transition-all duration-300`}
+        className={`${styleConfig.stroke} fill-none transition-all duration-300`}
+        markerStart={markerStart}
+        markerEnd={markerEnd}
+        style={{ stroke: 'currentColor' }}
       />
 
-      <g transform={`translate(${mx - 18}, ${my - 12})`}>
-        <rect 
-          width={36} height={24} rx={8} 
-          className="fill-white stroke-slate-200 group-hover:stroke-blue-500 shadow-sm transition-all duration-300"
-        />
-        <text 
-          x={18} y={16} 
-          textAnchor="middle" 
-          className="text-[10px] font-black fill-slate-500 group-hover:fill-blue-600 select-none"
-        >
-          {relationship.type}
-        </text>
+      {/* Interactive Label Container */}
+      <g 
+        transform={`translate(${mx - 25}, ${my - 15})`} 
+        onMouseEnter={() => setShowMenu(true)}
+        onMouseLeave={() => setShowMenu(false)}
+      >
+        <rect width={50} height={30} rx={10} className="fill-white stroke-slate-200 group-hover:stroke-current shadow-xl" />
+        
+        {!showMenu ? (
+          <text x={25} y={19} textAnchor="middle" className="text-[10px] font-black fill-slate-500 group-hover:fill-current select-none">
+            {relationship.type}
+          </text>
+        ) : (
+          <g className="animate-in fade-in duration-200">
+            <foreignObject x="0" y="0" width="50" height="30">
+               <div className="flex items-center justify-around h-full p-1">
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                   className="p-1 hover:bg-slate-100 rounded-lg text-blue-500"
+                 >
+                   <Edit2 className="w-3.5 h-3.5" />
+                 </button>
+                 <button 
+                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete connection?')) onDelete(); }}
+                   className="p-1 hover:bg-red-50 rounded-lg text-red-500"
+                 >
+                   <Trash2 className="w-3.5 h-3.5" />
+                 </button>
+               </div>
+            </foreignObject>
+          </g>
+        )}
       </g>
-
-      <circle cx={x1} cy={y1} r={3.5} className="fill-white stroke-slate-400 group-hover:stroke-blue-600 stroke-[1.5]" />
-      <circle cx={x2} cy={y2} r={3.5} className="fill-white stroke-slate-400 group-hover:stroke-blue-600 stroke-[1.5]" />
-
-      <path 
-        d={`M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`}
-        className="stroke-transparent stroke-[18px] fill-none cursor-pointer"
-        onClick={(e) => {
-          e.stopPropagation();
-          if(confirm(`Remove connection between tables?`)) onDelete();
-        }}
-      />
     </g>
   );
 });
