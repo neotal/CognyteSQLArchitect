@@ -26,7 +26,8 @@ const App: React.FC = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const isInitialLoadComplete = useRef(false);
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
+  // Ref for the scrollable container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('cognyte-sql-planner-state');
@@ -53,7 +54,6 @@ const App: React.FC = () => {
     }
   }, [tables, groups, relationships, zoom]);
 
-  // Derived search results
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
     const term = searchTerm.toLowerCase();
@@ -69,7 +69,7 @@ const App: React.FC = () => {
         }
       });
     });
-    return results.slice(0, 10); // Limit to 10 results for performance
+    return results.slice(0, 10);
   }, [searchTerm, tables]);
 
   const handleSearchResultClick = (tableId: string) => {
@@ -79,16 +79,33 @@ const App: React.FC = () => {
     // 1. Ensure table is expanded
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, isCollapsed: false } : t));
 
-    // 2. Jump to table location
+    // 2. Teleport to table
     setTimeout(() => {
       const tableEl = document.getElementById(`table-${tableId}`);
-      if (tableEl) {
-        tableEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-        // Visual feedback flash
-        tableEl.classList.add('ring-offset-4', 'ring-4', 'ring-blue-500');
-        setTimeout(() => tableEl.classList.remove('ring-offset-4', 'ring-4', 'ring-blue-500'), 2000);
+      const scrollContainer = document.querySelector('.canvas-scroll-container');
+      
+      if (tableEl && scrollContainer) {
+        const tableRect = tableEl.getBoundingClientRect();
+        const containerRect = scrollContainer.getBoundingClientRect();
+        
+        // Calculate the relative position to center the table in the viewport
+        const scrollLeft = scrollContainer.scrollLeft + (tableRect.left - containerRect.left) - (containerRect.width / 2) + (tableRect.width / 2);
+        const scrollTop = scrollContainer.scrollTop + (tableRect.top - containerRect.top) - (containerRect.height / 2) + (tableRect.height / 2);
+
+        scrollContainer.scrollTo({
+          left: scrollLeft,
+          top: scrollTop,
+          behavior: 'smooth'
+        });
+
+        // Feedback Flash
+        const card = tableEl.querySelector('.relative.bg-white');
+        if (card) {
+          card.classList.add('ring-4', 'ring-blue-500', 'ring-offset-4');
+          setTimeout(() => card.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-4'), 2000);
+        }
       }
-    }, 100);
+    }, 150);
   };
 
   const handleAddTable = (tableData: Partial<Table>) => {
@@ -104,8 +121,8 @@ const App: React.FC = () => {
       columns: tableData.columns || [],
       isCollapsed: false,
       position: { 
-        x: (targetGroup?.position.x || 100) + 50 + (Math.random() * 50), 
-        y: (targetGroup?.position.y || 100) + 80 + (Math.random() * 50) 
+        x: (targetGroup?.position.x || 100) + 50, 
+        y: (targetGroup?.position.y || 100) + 80 
       },
       sourceSystem: tableData.sourceSystem || '',
       businessArea: tableData.businessArea || '',
@@ -194,7 +211,7 @@ const App: React.FC = () => {
       />
 
       <div className="flex-1 flex flex-col relative">
-        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-[100]">
+        <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-[100] shadow-sm">
           <div className="flex items-center space-x-6">
             <h1 className="text-xl font-black bg-gradient-to-br from-slate-900 to-blue-900 bg-clip-text text-transparent">Cognyte Architect</h1>
             <div className="relative group/search">
@@ -208,12 +225,10 @@ const App: React.FC = () => {
                 onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
               />
 
-              {/* Advanced Search Dropdown */}
               {isSearchFocused && searchTerm.trim() && (
                 <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[200]">
                   <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Search Results</span>
-                    <span className="text-[10px] font-bold text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">{searchResults.length} found</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Global Index</span>
                   </div>
                   <div className="max-h-80 overflow-y-auto custom-scrollbar">
                     {searchResults.length > 0 ? (
@@ -235,7 +250,7 @@ const App: React.FC = () => {
                             </div>
                             {res.type === 'column' && (
                               <div className="text-[10px] text-slate-400 flex items-center mt-0.5">
-                                <span>belongs to</span>
+                                <span>within</span>
                                 <span className="font-bold text-slate-500 ml-1 italic">{res.parentTable}</span>
                               </div>
                             )}
@@ -244,12 +259,7 @@ const App: React.FC = () => {
                         </button>
                       ))
                     ) : (
-                      <div className="p-8 text-center">
-                        <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <X className="w-5 h-5 text-slate-300" />
-                        </div>
-                        <p className="text-slate-500 font-bold text-xs italic">No results found for "{searchTerm}"</p>
-                      </div>
+                      <div className="p-8 text-center text-slate-400 italic text-xs">No matches for "{searchTerm}"</div>
                     )}
                   </div>
                 </div>
@@ -258,16 +268,16 @@ const App: React.FC = () => {
           </div>
           <div className="flex items-center space-x-4">
              <div className="flex bg-slate-100 p-1.5 rounded-xl space-x-1 items-center">
-               <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors active:scale-95"><ZoomOut className="w-4 h-4" /></button>
+               <button onClick={() => setZoom(Math.max(0.1, zoom - 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ZoomOut className="w-4 h-4" /></button>
                <span className="text-[10px] font-black w-10 text-center">{Math.round(zoom * 100)}%</span>
-               <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors active:scale-95"><ZoomIn className="w-4 h-4" /></button>
+               <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ZoomIn className="w-4 h-4" /></button>
              </div>
-             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-indigo-600 hover:text-white"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
-             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all hover:bg-black active:scale-95"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
+             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
+             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
           </div>
         </header>
 
-        <main ref={canvasContainerRef} className="flex-1 overflow-hidden relative canvas-grid bg-slate-50">
+        <main className="flex-1 overflow-hidden relative canvas-grid bg-slate-50">
           <Canvas 
             tables={tables}
             groups={groups}

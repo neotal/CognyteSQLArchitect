@@ -55,7 +55,7 @@ const Canvas: React.FC<CanvasProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="w-full h-full relative cursor-grab active:cursor-grabbing overflow-auto"
+      className="w-full h-full relative cursor-grab active:cursor-grabbing overflow-auto canvas-scroll-container"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -88,17 +88,20 @@ const Canvas: React.FC<CanvasProps> = ({
         {/* Layer 2: Relationships SVG */}
         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible z-50">
           <defs>
-            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-               <path d="M 0 5 L 10 1 M 0 5 L 10 9 M 0 5 L 10 5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            {/* MANY side: Crow's Foot fanning OUT (3 lines) towards the table boundary */}
+            <marker id="crowfoot-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+               <path d="M 0 5 L 10 2 M 0 5 L 10 8 M 0 5 L 10 5" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
             </marker>
-            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-               <path d="M 10 5 L 0 1 M 10 5 L 0 9 M 10 5 L 0 5" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+            <marker id="crowfoot-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+               <path d="M 10 5 L 0 2 M 10 5 L 0 8 M 10 5 L 0 5" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" />
             </marker>
-            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="3" markerHeight="7" orient="auto">
-               <line x1="10" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5" />
+            
+            {/* ONE side: Clean perpendicular line, now thinner */}
+            <marker id="one-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="2" markerHeight="5" orient="auto">
+               <line x1="10" y1="0" x2="10" y2="10" stroke="currentColor" strokeWidth="1.2" />
             </marker>
-            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="3" markerHeight="7" orient="auto-start-reverse">
-               <line x1="0" y1="0" x2="0" y2="10" stroke="currentColor" strokeWidth="1.5" />
+            <marker id="one-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="2" markerHeight="5" orient="auto-start-reverse">
+               <line x1="0" y1="0" x2="0" y2="10" stroke="currentColor" strokeWidth="1.2" />
             </marker>
           </defs>
 
