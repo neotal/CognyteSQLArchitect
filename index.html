@@ -16,6 +16,17 @@
             background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
             background-size: 20px 20px;
         }
+        @keyframes highlight-pulse {
+            0% { outline: 0px solid #3b82f6; outline-offset: 0px; }
+            50% { outline: 8px solid #3b82f6; outline-offset: 10px; }
+            100% { outline: 0px solid transparent; outline-offset: 20px; }
+        }
+        .search-highlight {
+            animation: highlight-pulse 1.5s cubic-bezier(0, 0, 0.2, 1);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 <script type="importmap">
 {

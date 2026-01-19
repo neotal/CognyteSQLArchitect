@@ -7,7 +7,7 @@ import Sidebar from './components/Sidebar';
 import TableModal from './components/TableModal';
 import GroupModal from './components/GroupModal';
 import RelationModal from './components/RelationModal';
-import { DEFAULT_COLORS } from './constants';
+import { DEFAULT_COLORS, TABLE_WIDTH } from './constants';
 
 const App: React.FC = () => {
   const [tables, setTables] = useState<Table[]>([]);
@@ -26,8 +26,6 @@ const App: React.FC = () => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const isInitialLoadComplete = useRef(false);
-  // Ref for the scrollable container
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('cognyte-sql-planner-state');
@@ -73,39 +71,46 @@ const App: React.FC = () => {
   }, [searchTerm, tables]);
 
   const handleSearchResultClick = (tableId: string) => {
+    const targetTable = tables.find(t => t.id === tableId);
+    if (!targetTable) return;
+
     setSearchTerm('');
     setIsSearchFocused(false);
     
-    // 1. Ensure table is expanded
+    // 1. Force Expand the table immediately
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, isCollapsed: false } : t));
 
-    // 2. Teleport to table
+    // 2. Mathematical Centering Logic
     setTimeout(() => {
-      const tableEl = document.getElementById(`table-${tableId}`);
-      const scrollContainer = document.querySelector('.canvas-scroll-container');
-      
-      if (tableEl && scrollContainer) {
-        const tableRect = tableEl.getBoundingClientRect();
-        const containerRect = scrollContainer.getBoundingClientRect();
+      const container = document.querySelector('.canvas-scroll-container');
+      if (container) {
+        const { clientWidth, clientHeight } = container;
         
-        // Calculate the relative position to center the table in the viewport
-        const scrollLeft = scrollContainer.scrollLeft + (tableRect.left - containerRect.left) - (containerRect.width / 2) + (tableRect.width / 2);
-        const scrollTop = scrollContainer.scrollTop + (tableRect.top - containerRect.top) - (containerRect.height / 2) + (tableRect.height / 2);
+        // Exact pixel position on the zoomed canvas
+        const targetX = targetTable.position.x * zoom;
+        const targetY = targetTable.position.y * zoom;
+        
+        // Calculate scroll offsets to bring targetX/targetY to the center of container
+        const scrollLeft = targetX - (clientWidth / 2) + ((TABLE_WIDTH * zoom) / 2);
+        const scrollTop = targetY - (clientHeight / 2) + (100 * zoom); // 100 is approx half table height
 
-        scrollContainer.scrollTo({
+        container.scrollTo({
           left: scrollLeft,
           top: scrollTop,
           behavior: 'smooth'
         });
 
-        // Feedback Flash
-        const card = tableEl.querySelector('.relative.bg-white');
-        if (card) {
-          card.classList.add('ring-4', 'ring-blue-500', 'ring-offset-4');
-          setTimeout(() => card.classList.remove('ring-4', 'ring-blue-500', 'ring-offset-4'), 2000);
+        // 3. Highlight Flash
+        const tableEl = document.getElementById(`table-${tableId}`);
+        if (tableEl) {
+          const card = tableEl.querySelector('.relative.bg-white');
+          if (card) {
+            card.classList.add('search-highlight');
+            setTimeout(() => card.classList.remove('search-highlight'), 1500);
+          }
         }
       }
-    }, 150);
+    }, 100);
   };
 
   const handleAddTable = (tableData: Partial<Table>) => {
@@ -129,28 +134,7 @@ const App: React.FC = () => {
       businessUnit: tableData.businessUnit || '',
     };
 
-    const newRelationships: Relationship[] = [];
-    tables.forEach(existingTable => {
-      existingTable.columns.forEach(existingCol => {
-        newTable.columns.forEach(newCol => {
-          if (existingCol.name.toLowerCase() === newCol.name.toLowerCase() && existingCol.type === newCol.type) {
-            newRelationships.push({
-              id: crypto.randomUUID(),
-              fromTableId: existingTable.id,
-              fromColumnId: existingCol.id,
-              toTableId: newTable.id,
-              toColumnId: newCol.id,
-              type: '1:1'
-            });
-          }
-        });
-      });
-    });
-
     setTables(prev => [...prev, newTable]);
-    if (newRelationships.length > 0) {
-      setRelationships(prev => [...prev, ...newRelationships]);
-    }
     setIsTableModalOpen(false);
     setEditingTable(null);
   };
@@ -235,7 +219,7 @@ const App: React.FC = () => {
                       searchResults.map((res, i) => (
                         <button
                           key={i}
-                          onClick={() => handleSearchResultClick(res.tableId)}
+                          onMouseDown={(e) => { e.preventDefault(); handleSearchResultClick(res.tableId); }}
                           className="w-full p-4 flex items-center space-x-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0 group/item"
                         >
                           <div className={`p-2 rounded-lg transition-colors ${res.type === 'table' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
