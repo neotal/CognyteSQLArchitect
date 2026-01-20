@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { Plus, Search, ZoomIn, ZoomOut, Link as LinkIcon, Table as TableIcon, Hash, ChevronRight, X } from 'lucide-react';
+import { Plus, Search, ZoomIn, ZoomOut, Link as LinkIcon, Table as TableIcon, Hash, ChevronRight, X, Database, Globe, Briefcase } from 'lucide-react';
 import { Table, Group, Relationship, Column, RelationType } from './types';
 import Canvas from './components/Canvas';
 import Sidebar from './components/Sidebar';
@@ -52,14 +52,74 @@ const App: React.FC = () => {
     }
   }, [tables, groups, relationships, zoom]);
 
+  // Function to automatically find and create 1:1 relations based on identical column names
+  // With business logic to skip FCT to FCT links
+  const autoLinkTables = useCallback((currentTables: Table[], currentRels: Relationship[]) => {
+    const newRels: Relationship[] = [...currentRels];
+    let changed = false;
+
+    for (let i = 0; i < currentTables.length; i++) {
+      for (let j = i + 1; j < currentTables.length; j++) {
+        const tableA = currentTables[i];
+        const tableB = currentTables[j];
+
+        // NEW LOGIC: Skip auto-linking if BOTH tables are Fact tables (start with FCT)
+        const isTableAfct = tableA.name.toUpperCase().startsWith('FCT');
+        const isTableBfct = tableB.name.toUpperCase().startsWith('FCT');
+        
+        if (isTableAfct && isTableBfct) {
+          continue; // Skip this pair
+        }
+
+        tableA.columns.forEach(colA => {
+          const colB = tableB.columns.find(c => c.name.toLowerCase() === colA.name.toLowerCase());
+          
+          if (colB) {
+            const exists = newRels.some(r => 
+              (r.fromColumnId === colA.id && r.toColumnId === colB.id) ||
+              (r.fromColumnId === colB.id && r.toColumnId === colA.id)
+            );
+
+            if (!exists) {
+              newRels.push({
+                id: crypto.randomUUID(),
+                fromTableId: tableA.id,
+                fromColumnId: colA.id,
+                toTableId: tableB.id,
+                toColumnId: colB.id,
+                type: '1:1'
+              });
+              changed = true;
+            }
+          }
+        });
+      }
+    }
+    return changed ? newRels : null;
+  }, []);
+
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
     const term = searchTerm.toLowerCase();
-    const results: { type: 'table' | 'column', tableId: string, name: string, parentTable?: string }[] = [];
+    const results: { 
+      type: 'table' | 'column' | 'sourceSystem' | 'businessArea' | 'businessUnit', 
+      tableId: string, 
+      name: string, 
+      parentTable?: string 
+    }[] = [];
 
     tables.forEach(table => {
       if (table.name.toLowerCase().includes(term)) {
         results.push({ type: 'table', tableId: table.id, name: table.name });
+      }
+      if (table.sourceSystem?.toLowerCase().includes(term)) {
+        results.push({ type: 'sourceSystem', tableId: table.id, name: table.sourceSystem, parentTable: table.name });
+      }
+      if (table.businessArea?.toLowerCase().includes(term)) {
+        results.push({ type: 'businessArea', tableId: table.id, name: table.businessArea, parentTable: table.name });
+      }
+      if (table.businessUnit?.toLowerCase().includes(term)) {
+        results.push({ type: 'businessUnit', tableId: table.id, name: table.businessUnit, parentTable: table.name });
       }
       table.columns.forEach(col => {
         if (col.name.toLowerCase().includes(term)) {
@@ -67,40 +127,24 @@ const App: React.FC = () => {
         }
       });
     });
-    return results.slice(0, 10);
+    return results.slice(0, 15);
   }, [searchTerm, tables]);
 
   const handleSearchResultClick = (tableId: string) => {
     const targetTable = tables.find(t => t.id === tableId);
     if (!targetTable) return;
-
     setSearchTerm('');
     setIsSearchFocused(false);
-    
-    // 1. Force Expand the table immediately
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, isCollapsed: false } : t));
-
-    // 2. Mathematical Centering Logic
     setTimeout(() => {
       const container = document.querySelector('.canvas-scroll-container');
       if (container) {
         const { clientWidth, clientHeight } = container;
-        
-        // Exact pixel position on the zoomed canvas
         const targetX = targetTable.position.x * zoom;
         const targetY = targetTable.position.y * zoom;
-        
-        // Calculate scroll offsets to bring targetX/targetY to the center of container
         const scrollLeft = targetX - (clientWidth / 2) + ((TABLE_WIDTH * zoom) / 2);
-        const scrollTop = targetY - (clientHeight / 2) + (100 * zoom); // 100 is approx half table height
-
-        container.scrollTo({
-          left: scrollLeft,
-          top: scrollTop,
-          behavior: 'smooth'
-        });
-
-        // 3. Highlight Flash
+        const scrollTop = targetY - (clientHeight / 2) + (120 * zoom);
+        container.scrollTo({ left: scrollLeft, top: scrollTop, behavior: 'smooth' });
         const tableEl = document.getElementById(`table-${tableId}`);
         if (tableEl) {
           const card = tableEl.querySelector('.relative.bg-white');
@@ -111,6 +155,34 @@ const App: React.FC = () => {
         }
       }
     }, 100);
+  };
+
+  const getResultIcon = (type: string) => {
+    switch (type) {
+      case 'table': return <TableIcon className="w-4 h-4" />;
+      case 'column': return <Hash className="w-4 h-4" />;
+      case 'sourceSystem': return <Database className="w-4 h-4" />;
+      case 'businessArea': return <Globe className="w-4 h-4" />;
+      case 'businessUnit': return <Briefcase className="w-4 h-4" />;
+      default: return <Search className="w-4 h-4" />;
+    }
+  };
+
+  const getResultLabel = (type: string) => {
+    switch (type) {
+      case 'table': return 'Table';
+      case 'column': return 'Column';
+      case 'sourceSystem': return 'Source System';
+      case 'businessArea': return 'Business Area';
+      case 'businessUnit': return 'Business Unit';
+      default: return 'Result';
+    }
+  };
+
+  const getResultColorClass = (type: string) => {
+    if (type === 'table') return 'bg-blue-50 text-blue-600';
+    if (type === 'column') return 'bg-emerald-50 text-emerald-600';
+    return 'bg-amber-50 text-amber-600';
   };
 
   const handleAddTable = (tableData: Partial<Table>) => {
@@ -133,14 +205,23 @@ const App: React.FC = () => {
       businessArea: tableData.businessArea || '',
       businessUnit: tableData.businessUnit || '',
     };
+    
+    const updatedTables = [...tables, newTable];
+    setTables(updatedTables);
+    
+    const autoRels = autoLinkTables(updatedTables, relationships);
+    if (autoRels) setRelationships(autoRels);
 
-    setTables(prev => [...prev, newTable]);
     setIsTableModalOpen(false);
-    setEditingTable(null);
   };
 
   const handleUpdateTable = (updatedTable: Table) => {
-    setTables(prev => prev.map(t => t.id === updatedTable.id ? updatedTable : t));
+    const updatedTables = tables.map(t => t.id === updatedTable.id ? updatedTable : t);
+    setTables(updatedTables);
+    
+    const autoRels = autoLinkTables(updatedTables, relationships);
+    if (autoRels) setRelationships(autoRels);
+
     setIsTableModalOpen(false);
     setEditingTable(null);
   };
@@ -150,7 +231,7 @@ const App: React.FC = () => {
   };
 
   const handleDeleteTable = (id: string) => {
-    if (window.confirm("Are you sure?")) {
+    if (window.confirm("Are you sure you want to delete this table?")) {
       setTables(prev => prev.filter(t => t.id !== id));
       setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
     }
@@ -201,8 +282,8 @@ const App: React.FC = () => {
             <div className="relative group/search">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within/search:text-blue-500 transition-colors" />
               <input 
-                type="text" placeholder="Search tables or columns..." 
-                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 w-80 text-sm transition-all shadow-sm"
+                type="text" placeholder="Search tables, columns, or business context..." 
+                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 w-[420px] text-sm transition-all shadow-sm"
                 value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)}
                 onFocus={() => setIsSearchFocused(true)}
@@ -212,9 +293,9 @@ const App: React.FC = () => {
               {isSearchFocused && searchTerm.trim() && (
                 <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[200]">
                   <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Global Index</span>
+                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Global Data Catalog</span>
                   </div>
-                  <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
                     {searchResults.length > 0 ? (
                       searchResults.map((res, i) => (
                         <button
@@ -222,19 +303,19 @@ const App: React.FC = () => {
                           onMouseDown={(e) => { e.preventDefault(); handleSearchResultClick(res.tableId); }}
                           className="w-full p-4 flex items-center space-x-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0 group/item"
                         >
-                          <div className={`p-2 rounded-lg transition-colors ${res.type === 'table' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                            {res.type === 'table' ? <TableIcon className="w-4 h-4" /> : <Hash className="w-4 h-4" />}
+                          <div className={`p-2.5 rounded-lg transition-colors ${getResultColorClass(res.type)}`}>
+                            {getResultIcon(res.type)}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2">
                               <span className="font-bold text-slate-800 text-sm truncate">{res.name}</span>
-                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${res.type === 'table' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                {res.type}
+                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${getResultColorClass(res.type)}`}>
+                                {getResultLabel(res.type)}
                               </span>
                             </div>
-                            {res.type === 'column' && (
+                            {res.parentTable && (
                               <div className="text-[10px] text-slate-400 flex items-center mt-0.5">
-                                <span>within</span>
+                                <span>belongs to</span>
                                 <span className="font-bold text-slate-500 ml-1 italic">{res.parentTable}</span>
                               </div>
                             )}
@@ -243,7 +324,10 @@ const App: React.FC = () => {
                         </button>
                       ))
                     ) : (
-                      <div className="p-8 text-center text-slate-400 italic text-xs">No matches for "{searchTerm}"</div>
+                      <div className="p-12 text-center">
+                        <div className="text-slate-300 mb-2 flex justify-center"><Search className="w-8 h-8" /></div>
+                        <p className="text-slate-400 italic text-xs">No matches found for "{searchTerm}"</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -256,8 +340,8 @@ const App: React.FC = () => {
                <span className="text-[10px] font-black w-10 text-center">{Math.round(zoom * 100)}%</span>
                <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ZoomIn className="w-4 h-4" /></button>
              </div>
-             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
-             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
+             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
+             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
           </div>
         </header>
 
