@@ -7,6 +7,7 @@ import Sidebar from './components/Sidebar';
 import TableModal from './components/TableModal';
 import GroupModal from './components/GroupModal';
 import RelationModal from './components/RelationModal';
+import ConfirmationModal from './components/ConfirmationModal';
 import { DEFAULT_COLORS, TABLE_WIDTH } from './constants';
 
 const App: React.FC = () => {
@@ -16,12 +17,30 @@ const App: React.FC = () => {
   ]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [zoom, setZoom] = useState(1);
+  
+  // Modals state
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
+  
+  // Editing state
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [editingRelation, setEditingRelation] = useState<Relationship | null>(null);
+  
+  // Confirmation state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   
@@ -96,9 +115,15 @@ const App: React.FC = () => {
   }, []);
 
   const handleDeleteRelation = (id: string) => {
-    if (window.confirm("האם אתה בטוח שברצונך למחוק את הקשר הזה?")) {
-      setRelationships(prev => prev.filter(r => r.id !== id));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Relationship',
+      message: 'Are you sure you want to delete this relationship between the tables?',
+      onConfirm: () => {
+        setRelationships(prev => prev.filter(r => r.id !== id));
+        setConfirmModal(p => ({ ...p, isOpen: false }));
+      }
+    });
   };
 
   const handleDeleteTable = (id: string) => {
@@ -106,20 +131,22 @@ const App: React.FC = () => {
     if (!table) return;
 
     const linkedRels = relationships.filter(r => r.fromTableId === id || r.toTableId === id);
-    const tableGroups = groups.filter(g => table.groupIds.includes(g.id));
+    let message = `Are you sure you want to delete table "${table.name}"?`;
     
-    let warning = `האם אתה בטוח שברצונך למחוק את הטבלה "${table.name}"?`;
-    
-    if (linkedRels.length > 0 || tableGroups.length > 0) {
-      warning += "\n\nשים לב:";
-      if (linkedRels.length > 0) warning += `\n- קיימים ${linkedRels.length} קשרים לטבלאות אחרות שיימחקו.`;
-      if (tableGroups.length > 0) warning += `\n- הטבלה משויכת ל-${tableGroups.length} קבוצות.`;
+    if (linkedRels.length > 0) {
+      message += `\n\nNote: There are ${linkedRels.length} active relationship(s) linked to this table that will also be removed.`;
     }
 
-    if (window.confirm(warning)) {
-      setTables(prev => prev.filter(t => t.id !== id));
-      setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Table',
+      message,
+      onConfirm: () => {
+        setTables(prev => prev.filter(t => t.id !== id));
+        setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
+        setConfirmModal(p => ({ ...p, isOpen: false }));
+      }
+    });
   };
 
   const handleDeleteGroup = (id: string) => {
@@ -127,30 +154,31 @@ const App: React.FC = () => {
     if (!group) return;
 
     const groupTables = tables.filter(t => t.groupIds.includes(id));
-    let warning = `האם אתה בטוח שברצונך למחוק את הקבוצה "${group.name}"?`;
+    let message = `Are you sure you want to delete group "${group.name}"?`;
 
     if (groupTables.length > 0) {
-      warning += `\n\nשים לב: קבוצה זו מכילה ${groupTables.length} טבלאות. הטבלאות עצמן לא יימחקו, אך השיוך שלהן לקבוצה זו יוסר.`;
+      message += `\n\nNote: This group contains ${groupTables.length} table(s). The tables themselves will not be deleted, but their assignment to this group will be removed.`;
     }
 
-    if (window.confirm(warning)) {
-      setGroups(prev => prev.filter(g => g.id !== id));
-      setTables(prev => prev.map(t => ({
-        ...t,
-        groupIds: t.groupIds.filter(gid => gid !== id)
-      })));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete Group',
+      message,
+      onConfirm: () => {
+        setGroups(prev => prev.filter(g => g.id !== id));
+        setTables(prev => prev.map(t => ({
+          ...t,
+          groupIds: t.groupIds.filter(gid => gid !== id)
+        })));
+        setConfirmModal(p => ({ ...p, isOpen: false }));
+      }
+    });
   };
 
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
     const term = searchTerm.toLowerCase();
-    const results: { 
-      type: 'table' | 'column' | 'sourceSystem' | 'businessArea' | 'businessUnit', 
-      tableId: string, 
-      name: string, 
-      parentTable?: string 
-    }[] = [];
+    const results: any[] = [];
 
     tables.forEach(table => {
       if (table.name.toLowerCase().includes(term)) {
@@ -201,36 +229,8 @@ const App: React.FC = () => {
     }, 100);
   };
 
-  const getResultIcon = (type: string) => {
-    switch (type) {
-      case 'table': return <TableIcon className="w-4 h-4" />;
-      case 'column': return <Hash className="w-4 h-4" />;
-      case 'sourceSystem': return <Database className="w-4 h-4" />;
-      case 'businessArea': return <Globe className="w-4 h-4" />;
-      case 'businessUnit': return <Briefcase className="w-4 h-4" />;
-      default: return <Search className="w-4 h-4" />;
-    }
-  };
-
-  const getResultLabel = (type: string) => {
-    switch (type) {
-      case 'table': return 'Table';
-      case 'column': return 'Column';
-      case 'sourceSystem': return 'Source System';
-      case 'businessArea': return 'Business Area';
-      case 'businessUnit': return 'Business Unit';
-      default: return 'Result';
-    }
-  };
-
-  const getResultColorClass = (type: string) => {
-    if (type === 'table') return 'bg-blue-50 text-blue-600';
-    if (type === 'column') return 'bg-emerald-50 text-emerald-600';
-    return 'bg-amber-50 text-amber-600';
-  };
-
   const handleAddTable = (tableData: Partial<Table>) => {
-    const targetGroupId = tableData.groupIds?.[0] || groups[0].id;
+    const targetGroupId = tableData.groupIds?.[0] || groups[0]?.id || 'default';
     const targetGroup = groups.find(g => g.id === targetGroupId);
     
     const newTable: Table = {
@@ -324,49 +324,6 @@ const App: React.FC = () => {
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
               />
-
-              {isSearchFocused && searchTerm.trim() && (
-                <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-[200]">
-                  <div className="p-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Global Data Catalog</span>
-                  </div>
-                  <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
-                    {searchResults.length > 0 ? (
-                      searchResults.map((res, i) => (
-                        <button
-                          key={i}
-                          onMouseDown={(e) => { e.preventDefault(); handleSearchResultClick(res.tableId); }}
-                          className="w-full p-4 flex items-center space-x-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0 group/item"
-                        >
-                          <div className={`p-2.5 rounded-lg transition-colors ${getResultColorClass(res.type)}`}>
-                            {getResultIcon(res.type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2">
-                              <span className="font-bold text-slate-800 text-sm truncate">{res.name}</span>
-                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${getResultColorClass(res.type)}`}>
-                                {getResultLabel(res.type)}
-                              </span>
-                            </div>
-                            {res.parentTable && (
-                              <div className="text-[10px] text-slate-400 flex items-center mt-0.5">
-                                <span>belongs to</span>
-                                <span className="font-bold text-slate-500 ml-1 italic">{res.parentTable}</span>
-                              </div>
-                            )}
-                          </div>
-                          <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover/item:text-blue-500 group-hover/item:translate-x-1 transition-all" />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="p-12 text-center">
-                        <div className="text-slate-300 mb-2 flex justify-center"><Search className="w-8 h-8" /></div>
-                        <p className="text-slate-400 italic text-xs">No matches found for "{searchTerm}"</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -400,6 +357,14 @@ const App: React.FC = () => {
       {isTableModalOpen && <TableModal groups={groups} initialData={editingTable} allTables={tables} onSave={editingTable ? handleUpdateTable : handleAddTable} onClose={() => setIsTableModalOpen(false)} />}
       {isGroupModalOpen && <GroupModal initialData={editingGroup} onSave={editingGroup ? handleUpdateGroup : handleAddGroup} onClose={() => setIsGroupModalOpen(false)} />}
       {isRelationModalOpen && <RelationModal tables={tables} initialData={editingRelation} onSave={handleSaveRelationship} onClose={() => setIsRelationModalOpen(false)} />}
+      
+      <ConfirmationModal 
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(p => ({ ...p, isOpen: false }))}
+      />
     </div>
   );
 };
