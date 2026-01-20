@@ -183,7 +183,7 @@ const App: React.FC = () => {
         groups={groups} 
         isDirty={isDirty}
         onAddGroup={() => { setEditingGroup(null); setIsGroupModalOpen(true); }}
-        onEditGroup={(g) => { setEditingGroup(g); setIsGroupModalOpen(true); }}
+        onEditGroup={(g: any) => { setEditingGroup(g); setIsGroupModalOpen(true); }}
         onDeleteGroup={(id) => {
           setConfirmModal({
             isOpen: true, title: 'Delete Group', message: 'Delete group? Tables will remain but lose group association.',
