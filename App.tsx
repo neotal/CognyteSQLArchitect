@@ -52,8 +52,6 @@ const App: React.FC = () => {
     }
   }, [tables, groups, relationships, zoom]);
 
-  // Function to automatically find and create 1:1 relations based on identical column names
-  // With business logic to skip FCT to FCT links
   const autoLinkTables = useCallback((currentTables: Table[], currentRels: Relationship[]) => {
     const newRels: Relationship[] = [...currentRels];
     let changed = false;
@@ -63,12 +61,11 @@ const App: React.FC = () => {
         const tableA = currentTables[i];
         const tableB = currentTables[j];
 
-        // NEW LOGIC: Skip auto-linking if BOTH tables are Fact tables (start with FCT)
         const isTableAfct = tableA.name.toUpperCase().startsWith('FCT');
         const isTableBfct = tableB.name.toUpperCase().startsWith('FCT');
         
         if (isTableAfct && isTableBfct) {
-          continue; // Skip this pair
+          continue; 
         }
 
         tableA.columns.forEach(colA => {
@@ -97,6 +94,46 @@ const App: React.FC = () => {
     }
     return changed ? newRels : null;
   }, []);
+
+  const handleDeleteRelation = (id: string) => {
+    if (window.confirm("Are you sure you want to delete this connection?")) {
+      setRelationships(prev => prev.filter(r => r.id !== id));
+    }
+  };
+
+  const handleDeleteTable = (id: string) => {
+    const table = tables.find(t => t.id === id);
+    if (!table) return;
+
+    const hasRelations = relationships.some(r => r.fromTableId === id || r.toTableId === id);
+    const message = hasRelations 
+      ? `Are you sure you want to delete table "${table.name}"? This table has active relationships that will also be removed.`
+      : `Are you sure you want to delete table "${table.name}"?`;
+
+    if (window.confirm(message)) {
+      setTables(prev => prev.filter(t => t.id !== id));
+      setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
+    }
+  };
+
+  const handleDeleteGroup = (id: string) => {
+    const group = groups.find(g => g.id === id);
+    if (!group) return;
+
+    const groupTables = tables.filter(t => t.groupIds.includes(id));
+    const message = groupTables.length > 0
+      ? `Are you sure you want to delete group "${group.name}"? This group contains ${groupTables.length} tables. The tables will not be deleted, but their assignment to this group will be removed.`
+      : `Are you sure you want to delete group "${group.name}"?`;
+
+    if (window.confirm(message)) {
+      setGroups(prev => prev.filter(g => g.id !== id));
+      // Update tables to remove this group ID from their assignments
+      setTables(prev => prev.map(t => ({
+        ...t,
+        groupIds: t.groupIds.filter(gid => gid !== id)
+      })));
+    }
+  };
 
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
@@ -230,13 +267,6 @@ const App: React.FC = () => {
     setTables(prev => prev.map(t => t.id === id ? { ...t, isCollapsed: !t.isCollapsed } : t));
   };
 
-  const handleDeleteTable = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this table?")) {
-      setTables(prev => prev.filter(t => t.id !== id));
-      setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
-    }
-  };
-
   const handleAddGroup = (groupData: Partial<Group>) => {
     const newGroup: Group = {
       id: crypto.randomUUID(),
@@ -264,15 +294,13 @@ const App: React.FC = () => {
     setEditingRelation(null);
   };
 
-  const handleDeleteRelation = (id: string) => setRelationships(prev => prev.filter(r => r.id !== id));
-
   return (
     <div className="flex h-screen w-full bg-[#f8fafc] text-slate-900 overflow-hidden font-sans">
       <Sidebar 
         groups={groups} 
         onAddGroup={() => { setEditingGroup(null); setIsGroupModalOpen(true); }}
         onEditGroup={(g) => { setEditingGroup(g); setIsGroupModalOpen(true); }}
-        onDeleteGroup={(id) => setGroups(prev => prev.filter(g => g.id !== id))}
+        onDeleteGroup={handleDeleteGroup}
       />
 
       <div className="flex-1 flex flex-col relative">
