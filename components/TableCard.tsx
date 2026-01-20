@@ -122,8 +122,20 @@ const TableCard: React.FC<TableCardProps> = memo(({
           <h3 className="font-black text-slate-800 text-sm truncate tracking-tight">{table.name}</h3>
         </div>
         <div className="flex items-center space-x-1 opacity-0 group-hover/table:opacity-100 transition-opacity">
-          <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600 transition-all"><Edit2 className="w-3.5 h-3.5" /></button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-600 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button 
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onEdit(); }} 
+            className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-blue-600 transition-all"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+            className="p-1.5 hover:bg-white rounded-lg text-slate-400 hover:text-red-600 transition-all"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

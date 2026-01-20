@@ -102,6 +102,7 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({
             <foreignObject x="0" y="0" width="50" height="30">
                <div className="flex items-center justify-around h-full p-1 bg-white rounded-xl">
                  <button 
+                   onMouseDown={(e) => e.stopPropagation()}
                    onClick={(e) => { e.stopPropagation(); onEdit(); }}
                    className="p-1 hover:bg-blue-50 rounded-lg text-blue-500 transition-colors"
                    title="Edit Connection"
@@ -109,6 +110,7 @@ const RelationshipLine: React.FC<RelationshipLineProps> = memo(({
                    <Edit2 className="w-3.5 h-3.5" />
                  </button>
                  <button 
+                   onMouseDown={(e) => e.stopPropagation()}
                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
                    className="p-1 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
                    title="Delete Connection"

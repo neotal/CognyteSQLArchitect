@@ -96,7 +96,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleDeleteRelation = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this connection?")) {
+    if (window.confirm("האם אתה בטוח שברצונך למחוק את הקשר הזה?")) {
       setRelationships(prev => prev.filter(r => r.id !== id));
     }
   };
@@ -105,12 +105,18 @@ const App: React.FC = () => {
     const table = tables.find(t => t.id === id);
     if (!table) return;
 
-    const hasRelations = relationships.some(r => r.fromTableId === id || r.toTableId === id);
-    const message = hasRelations 
-      ? `Are you sure you want to delete table "${table.name}"? This table has active relationships that will also be removed.`
-      : `Are you sure you want to delete table "${table.name}"?`;
+    const linkedRels = relationships.filter(r => r.fromTableId === id || r.toTableId === id);
+    const tableGroups = groups.filter(g => table.groupIds.includes(g.id));
+    
+    let warning = `האם אתה בטוח שברצונך למחוק את הטבלה "${table.name}"?`;
+    
+    if (linkedRels.length > 0 || tableGroups.length > 0) {
+      warning += "\n\nשים לב:";
+      if (linkedRels.length > 0) warning += `\n- קיימים ${linkedRels.length} קשרים לטבלאות אחרות שיימחקו.`;
+      if (tableGroups.length > 0) warning += `\n- הטבלה משויכת ל-${tableGroups.length} קבוצות.`;
+    }
 
-    if (window.confirm(message)) {
+    if (window.confirm(warning)) {
       setTables(prev => prev.filter(t => t.id !== id));
       setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
     }
@@ -121,13 +127,14 @@ const App: React.FC = () => {
     if (!group) return;
 
     const groupTables = tables.filter(t => t.groupIds.includes(id));
-    const message = groupTables.length > 0
-      ? `Are you sure you want to delete group "${group.name}"? This group contains ${groupTables.length} tables. The tables will not be deleted, but their assignment to this group will be removed.`
-      : `Are you sure you want to delete group "${group.name}"?`;
+    let warning = `האם אתה בטוח שברצונך למחוק את הקבוצה "${group.name}"?`;
 
-    if (window.confirm(message)) {
+    if (groupTables.length > 0) {
+      warning += `\n\nשים לב: קבוצה זו מכילה ${groupTables.length} טבלאות. הטבלאות עצמן לא יימחקו, אך השיוך שלהן לקבוצה זו יוסר.`;
+    }
+
+    if (window.confirm(warning)) {
       setGroups(prev => prev.filter(g => g.id !== id));
-      // Update tables to remove this group ID from their assignments
       setTables(prev => prev.map(t => ({
         ...t,
         groupIds: t.groupIds.filter(gid => gid !== id)
