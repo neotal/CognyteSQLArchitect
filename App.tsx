@@ -46,30 +46,98 @@ const App: React.FC = () => {
   
   const isInitialLoadComplete = useRef(false);
 
+  // Core Load Logic: Priority: project-data.json (Git sync) -> localStorage (Unsaved changes)
   useEffect(() => {
-    const saved = localStorage.getItem('cognyte-sql-planner-state');
-    if (saved) {
+    const loadInitialData = async () => {
+      let loadedState = null;
+
+      // 1. First Priority: Try to fetch the shared project-data.json from the root
       try {
-        const parsed = JSON.parse(saved);
-        if (parsed.tables) setTables(parsed.tables);
-        if (parsed.groups) setGroups(parsed.groups);
-        if (parsed.relationships) setRelationships(parsed.relationships);
-        if (parsed.zoom) setZoom(parsed.zoom);
+        const response = await fetch('./project-data.json', { cache: 'no-cache' });
+        if (response.ok) {
+          loadedState = await response.json();
+          console.log("Visual schema synced with project-data.json from repository");
+        }
       } catch (e) {
-        console.error("Failed to parse saved state", e);
+        console.warn("Project file not found or inaccessible. Checking local cache.");
       }
-    }
-    setTimeout(() => {
-      isInitialLoadComplete.current = true;
-    }, 100);
+
+      // 2. Secondary: Fallback to local storage for temporary session persistence
+      if (!loadedState) {
+        const saved = localStorage.getItem('cognyte-sql-planner-state');
+        if (saved) {
+          try {
+            loadedState = JSON.parse(saved);
+          } catch (e) {
+            console.error("Failed to parse local state", e);
+          }
+        }
+      }
+
+      if (loadedState) {
+        if (loadedState.tables) setTables(loadedState.tables);
+        if (loadedState.groups) setGroups(loadedState.groups);
+        if (loadedState.relationships) setRelationships(loadedState.relationships);
+        if (loadedState.zoom) setZoom(loadedState.zoom);
+      }
+
+      setTimeout(() => {
+        isInitialLoadComplete.current = true;
+      }, 100);
+    };
+
+    loadInitialData();
   }, []);
 
+  // Continuous background backup to local storage (safety net)
   useEffect(() => {
     if (isInitialLoadComplete.current) {
       const stateToSave = { tables, groups, relationships, zoom };
       localStorage.setItem('cognyte-sql-planner-state', JSON.stringify(stateToSave));
     }
   }, [tables, groups, relationships, zoom]);
+
+  // The "Commit to File" function - Downloads the JSON to replace the project-data.json
+  const exportState = () => {
+    const state = { 
+      tables, 
+      groups, 
+      relationships, 
+      zoom,
+      lastUpdated: new Date().toISOString(),
+      version: "1.0"
+    };
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'project-data.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const importState = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string);
+        if (imported.tables) setTables(imported.tables);
+        if (imported.groups) setGroups(imported.groups);
+        if (imported.relationships) setRelationships(imported.relationships);
+        if (imported.zoom) setZoom(imported.zoom);
+        alert("Project schema updated successfully from file!");
+      } catch (err) {
+        alert("Critical Error: The file content is not a valid project JSON.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const autoLinkTables = useCallback((currentTables: Table[], currentRels: Relationship[]) => {
     const newRels: Relationship[] = [...currentRels];
@@ -79,30 +147,20 @@ const App: React.FC = () => {
       for (let j = i + 1; j < currentTables.length; j++) {
         const tableA = currentTables[i];
         const tableB = currentTables[j];
-
-        const isTableAfct = tableA.name.toUpperCase().startsWith('FCT');
-        const isTableBfct = tableB.name.toUpperCase().startsWith('FCT');
-        
-        if (isTableAfct && isTableBfct) {
-          continue; 
-        }
+        if (tableA.name.toUpperCase().startsWith('FCT') && tableB.name.toUpperCase().startsWith('FCT')) continue;
 
         tableA.columns.forEach(colA => {
           const colB = tableB.columns.find(c => c.name.toLowerCase() === colA.name.toLowerCase());
-          
           if (colB) {
             const exists = newRels.some(r => 
               (r.fromColumnId === colA.id && r.toColumnId === colB.id) ||
               (r.fromColumnId === colB.id && r.toColumnId === colA.id)
             );
-
             if (!exists) {
               newRels.push({
                 id: crypto.randomUUID(),
-                fromTableId: tableA.id,
-                fromColumnId: colA.id,
-                toTableId: tableB.id,
-                toColumnId: colB.id,
+                fromTableId: tableA.id, fromColumnId: colA.id,
+                toTableId: tableB.id, toColumnId: colB.id,
                 type: '1:1'
               });
               changed = true;
@@ -118,7 +176,7 @@ const App: React.FC = () => {
     setConfirmModal({
       isOpen: true,
       title: 'Delete Relationship',
-      message: 'Are you sure you want to delete this relationship between the tables?',
+      message: 'Are you sure you want to delete this relationship? This will only remove the link, not the columns.',
       onConfirm: () => {
         setRelationships(prev => prev.filter(r => r.id !== id));
         setConfirmModal(p => ({ ...p, isOpen: false }));
@@ -129,13 +187,9 @@ const App: React.FC = () => {
   const handleDeleteTable = (id: string) => {
     const table = tables.find(t => t.id === id);
     if (!table) return;
-
     const linkedRels = relationships.filter(r => r.fromTableId === id || r.toTableId === id);
-    let message = `Are you sure you want to delete table "${table.name}"?`;
-    
-    if (linkedRels.length > 0) {
-      message += `\n\nNote: There are ${linkedRels.length} active relationship(s) linked to this table that will also be removed.`;
-    }
+    let message = `Delete table "${table.name}"?`;
+    if (linkedRels.length > 0) message += `\n\nWarning: ${linkedRels.length} relationships will also be destroyed.`;
 
     setConfirmModal({
       isOpen: true,
@@ -152,13 +206,9 @@ const App: React.FC = () => {
   const handleDeleteGroup = (id: string) => {
     const group = groups.find(g => g.id === id);
     if (!group) return;
-
     const groupTables = tables.filter(t => t.groupIds.includes(id));
-    let message = `Are you sure you want to delete group "${group.name}"?`;
-
-    if (groupTables.length > 0) {
-      message += `\n\nNote: This group contains ${groupTables.length} table(s). The tables themselves will not be deleted, but their assignment to this group will be removed.`;
-    }
+    let message = `Delete group "${group.name}"?`;
+    if (groupTables.length > 0) message += `\n\nNote: Tables inside will lose their group association but remain on canvas.`;
 
     setConfirmModal({
       isOpen: true,
@@ -166,73 +216,15 @@ const App: React.FC = () => {
       message,
       onConfirm: () => {
         setGroups(prev => prev.filter(g => g.id !== id));
-        setTables(prev => prev.map(t => ({
-          ...t,
-          groupIds: t.groupIds.filter(gid => gid !== id)
-        })));
+        setTables(prev => prev.map(t => ({ ...t, groupIds: t.groupIds.filter(gid => gid !== id) })));
         setConfirmModal(p => ({ ...p, isOpen: false }));
       }
     });
   };
 
-  const searchResults = useMemo(() => {
-    if (!searchTerm.trim()) return [];
-    const term = searchTerm.toLowerCase();
-    const results: any[] = [];
-
-    tables.forEach(table => {
-      if (table.name.toLowerCase().includes(term)) {
-        results.push({ type: 'table', tableId: table.id, name: table.name });
-      }
-      if (table.sourceSystem?.toLowerCase().includes(term)) {
-        results.push({ type: 'sourceSystem', tableId: table.id, name: table.sourceSystem, parentTable: table.name });
-      }
-      if (table.businessArea?.toLowerCase().includes(term)) {
-        results.push({ type: 'businessArea', tableId: table.id, name: table.businessArea, parentTable: table.name });
-      }
-      if (table.businessUnit?.toLowerCase().includes(term)) {
-        results.push({ type: 'businessUnit', tableId: table.id, name: table.businessUnit, parentTable: table.name });
-      }
-      table.columns.forEach(col => {
-        if (col.name.toLowerCase().includes(term)) {
-          results.push({ type: 'column', tableId: table.id, name: col.name, parentTable: table.name });
-        }
-      });
-    });
-    return results.slice(0, 15);
-  }, [searchTerm, tables]);
-
-  const handleSearchResultClick = (tableId: string) => {
-    const targetTable = tables.find(t => t.id === tableId);
-    if (!targetTable) return;
-    setSearchTerm('');
-    setIsSearchFocused(false);
-    setTables(prev => prev.map(t => t.id === tableId ? { ...t, isCollapsed: false } : t));
-    setTimeout(() => {
-      const container = document.querySelector('.canvas-scroll-container');
-      if (container) {
-        const { clientWidth, clientHeight } = container;
-        const targetX = targetTable.position.x * zoom;
-        const targetY = targetTable.position.y * zoom;
-        const scrollLeft = targetX - (clientWidth / 2) + ((TABLE_WIDTH * zoom) / 2);
-        const scrollTop = targetY - (clientHeight / 2) + (120 * zoom);
-        container.scrollTo({ left: scrollLeft, top: scrollTop, behavior: 'smooth' });
-        const tableEl = document.getElementById(`table-${tableId}`);
-        if (tableEl) {
-          const card = tableEl.querySelector('.relative.bg-white');
-          if (card) {
-            card.classList.add('search-highlight');
-            setTimeout(() => card.classList.remove('search-highlight'), 1500);
-          }
-        }
-      }
-    }, 100);
-  };
-
   const handleAddTable = (tableData: Partial<Table>) => {
     const targetGroupId = tableData.groupIds?.[0] || groups[0]?.id || 'default';
     const targetGroup = groups.find(g => g.id === targetGroupId);
-    
     const newTable: Table = {
       id: crypto.randomUUID(),
       name: tableData.name || 'new_table',
@@ -241,31 +233,23 @@ const App: React.FC = () => {
       groupIds: tableData.groupIds || [targetGroupId],
       columns: tableData.columns || [],
       isCollapsed: false,
-      position: { 
-        x: (targetGroup?.position.x || 100) + 50, 
-        y: (targetGroup?.position.y || 100) + 80 
-      },
+      position: { x: (targetGroup?.position.x || 100) + 50, y: (targetGroup?.position.y || 100) + 80 },
       sourceSystem: tableData.sourceSystem || '',
       businessArea: tableData.businessArea || '',
       businessUnit: tableData.businessUnit || '',
     };
-    
     const updatedTables = [...tables, newTable];
     setTables(updatedTables);
-    
     const autoRels = autoLinkTables(updatedTables, relationships);
     if (autoRels) setRelationships(autoRels);
-
     setIsTableModalOpen(false);
   };
 
   const handleUpdateTable = (updatedTable: Table) => {
     const updatedTables = tables.map(t => t.id === updatedTable.id ? updatedTable : t);
     setTables(updatedTables);
-    
     const autoRels = autoLinkTables(updatedTables, relationships);
     if (autoRels) setRelationships(autoRels);
-
     setIsTableModalOpen(false);
     setEditingTable(null);
   };
@@ -279,7 +263,7 @@ const App: React.FC = () => {
       id: crypto.randomUUID(),
       name: groupData.name || 'New Group',
       color: groupData.color || '#3b82f6',
-      position: { x: Math.random() * 300, y: Math.random() * 300 },
+      position: { x: 300, y: 300 },
       size: { width: 400, height: 400 }
     };
     setGroups(prev => [...prev, newGroup]);
@@ -308,6 +292,8 @@ const App: React.FC = () => {
         onAddGroup={() => { setEditingGroup(null); setIsGroupModalOpen(true); }}
         onEditGroup={(g) => { setEditingGroup(g); setIsGroupModalOpen(true); }}
         onDeleteGroup={handleDeleteGroup}
+        onExport={exportState}
+        onImport={importState}
       />
 
       <div className="flex-1 flex flex-col relative">
@@ -317,12 +303,9 @@ const App: React.FC = () => {
             <div className="relative group/search">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within/search:text-blue-500 transition-colors" />
               <input 
-                type="text" placeholder="Search tables, columns, or business context..." 
-                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 w-[420px] text-sm transition-all shadow-sm"
-                value={searchTerm} 
-                onChange={e => setSearchTerm(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                type="text" placeholder="Search architecture..." 
+                className="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-400 w-[300px] text-sm transition-all shadow-sm"
+                value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
@@ -339,12 +322,8 @@ const App: React.FC = () => {
 
         <main className="flex-1 overflow-hidden relative canvas-grid bg-slate-50">
           <Canvas 
-            tables={tables}
-            groups={groups}
-            relationships={relationships}
-            zoom={zoom}
-            setTables={setTables}
-            setGroups={setGroups}
+            tables={tables} groups={groups} relationships={relationships} zoom={zoom}
+            setTables={setTables} setGroups={setGroups}
             onEditTable={(t) => { setEditingTable(t); setIsTableModalOpen(true); }}
             onEditRelation={(r) => { setEditingRelation(r); setIsRelationModalOpen(true); }}
             onDeleteTable={handleDeleteTable}
@@ -359,11 +338,8 @@ const App: React.FC = () => {
       {isRelationModalOpen && <RelationModal tables={tables} initialData={editingRelation} onSave={handleSaveRelationship} onClose={() => setIsRelationModalOpen(false)} />}
       
       <ConfirmationModal 
-        isOpen={confirmModal.isOpen}
-        title={confirmModal.title}
-        message={confirmModal.message}
-        onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(p => ({ ...p, isOpen: false }))}
+        isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm} onCancel={() => setConfirmModal(p => ({ ...p, isOpen: false }))}
       />
     </div>
   );

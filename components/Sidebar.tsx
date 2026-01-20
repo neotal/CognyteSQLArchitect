@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Users, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Download, Upload, FileJson, Github } from 'lucide-react';
 import { Group } from '../types';
 
 interface SidebarProps {
@@ -8,9 +8,11 @@ interface SidebarProps {
   onAddGroup: () => void;
   onEditGroup: (group: Group) => void;
   onDeleteGroup: (id: string) => void;
+  onExport: () => void;
+  onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDeleteGroup }) => {
+const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDeleteGroup, onExport, onImport }) => {
   return (
     <div className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-lg z-20">
       <div className="p-6 border-b border-slate-100">
@@ -80,10 +82,35 @@ const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDe
         ))}
       </div>
       
-      <div className="p-4 border-t border-slate-50 bg-slate-50/50">
-        <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-          <span>Schema Inventory</span>
-          <span className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-mono">{groups.length} Groups</span>
+      <div className="p-6 border-t border-slate-100 bg-slate-50/50">
+        <div className="flex items-center text-slate-800 mb-4">
+          <Github className="w-5 h-5 mr-2 text-slate-700" />
+          <h2 className="font-bold text-sm tracking-tight">Git Persistence</h2>
+        </div>
+        
+        <div className="space-y-3">
+          <button 
+            onClick={onExport}
+            className="w-full flex items-center justify-center p-3.5 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all group shadow-lg shadow-slate-200"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Update Project File</span>
+          </button>
+          
+          <label className="flex items-center justify-center p-3.5 bg-white border border-slate-200 rounded-2xl hover:border-indigo-300 hover:bg-indigo-50 transition-all group cursor-pointer shadow-sm">
+            <Upload className="w-4 h-4 mr-2 text-slate-400 group-hover:text-indigo-600" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-indigo-700">Import Local JSON</span>
+            <input type="file" accept=".json" onChange={onImport} className="hidden" />
+          </label>
+        </div>
+        
+        <div className="mt-5 p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+           <p className="text-[9px] text-slate-500 font-medium leading-relaxed">
+             <span className="font-black text-slate-900 block mb-1 uppercase tracking-tighter">Workflow:</span>
+             1. Press <span className="text-indigo-600 font-bold">Update Project File</span><br/>
+             2. Save as <span className="text-slate-900 font-bold">project-data.json</span><br/>
+             3. <span className="italic font-bold">Git Commit & Push</span> to share.
+           </p>
         </div>
       </div>
     </div>
