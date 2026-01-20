@@ -1,17 +1,18 @@
 
 import React from 'react';
-import { Users, Plus, Edit2, Trash2, Github, Save, Info } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Github, Save, Info, AlertCircle } from 'lucide-react';
 import { Group } from '../types';
 
 interface SidebarProps {
   groups: Group[];
+  isDirty: boolean;
   onAddGroup: () => void;
   onEditGroup: (group: Group) => void;
   onDeleteGroup: (id: string) => void;
   onExport: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDeleteGroup, onExport }) => {
+const Sidebar: React.FC<SidebarProps> = ({ groups, isDirty, onAddGroup, onEditGroup, onDeleteGroup, onExport }) => {
   return (
     <div className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-lg z-20">
       <div className="p-6 border-b border-slate-100">
@@ -80,18 +81,31 @@ const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDe
       </div>
       
       <div className="p-6 border-t border-slate-100 bg-slate-50/50">
-        <div className="flex items-center text-slate-800 mb-4">
-          <Github className="w-5 h-5 mr-2 text-slate-700" />
-          <h2 className="font-bold text-sm tracking-tight">Git Synchronization</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center text-slate-800">
+            <Github className="w-5 h-5 mr-2 text-slate-700" />
+            <h2 className="font-bold text-sm tracking-tight">Sync & Git</h2>
+          </div>
+          {isDirty && (
+            <div className="flex items-center text-[9px] font-black text-amber-500 uppercase animate-pulse">
+              <AlertCircle className="w-3 h-3 mr-1" /> Unsynced
+            </div>
+          )}
         </div>
         
         <div className="space-y-3">
           <button 
             onClick={onExport}
-            className="w-full flex items-center justify-center p-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all group shadow-lg shadow-slate-200 active:scale-95"
+            className={`w-full flex items-center justify-center p-4 rounded-2xl transition-all group shadow-lg active:scale-95 ${
+              isDirty 
+              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 border-2 border-blue-400' 
+              : 'bg-slate-900 text-white hover:bg-black shadow-slate-200'
+            }`}
           >
-            <Save className="w-4 h-4 mr-2" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Update Project File</span>
+            <Save className={`w-4 h-4 mr-2 ${isDirty ? 'animate-bounce' : ''}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {isDirty ? 'Sync Changes to File' : 'Update Project File'}
+            </span>
           </button>
         </div>
         
@@ -99,15 +113,17 @@ const Sidebar: React.FC<SidebarProps> = ({ groups, onAddGroup, onEditGroup, onDe
            <div className="flex items-start space-x-2">
              <Info className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
              <p className="text-[9px] text-slate-500 font-medium leading-relaxed">
-               This app loads its data directly from <span className="text-slate-900 font-bold">project-data.json</span> in the root folder.
+               Loads strictly from <span className="text-slate-900 font-bold">project-data.json</span>. 
+               Git pull will refresh your canvas instantly.
              </p>
            </div>
            
            <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
-             <span className="font-black text-slate-900 block mb-1 uppercase tracking-tighter text-[8px]">Sync Steps:</span>
+             <span className="font-black text-slate-900 block mb-1 uppercase tracking-tighter text-[8px]">Workflow:</span>
              <ol className="text-[8px] text-slate-500 space-y-1 list-decimal ml-3">
-               <li>Click <span className="font-bold">Update Project File</span></li>
-               <li>Replace the existing file in your local repo</li>
+               <li>Make manual updates on canvas</li>
+               <li>Click <span className="font-bold text-blue-600">Sync to File</span></li>
+               <li>Overwrite <span className="font-bold">project-data.json</span></li>
                <li><span className="italic font-bold">Git Commit & Push</span></li>
              </ol>
            </div>

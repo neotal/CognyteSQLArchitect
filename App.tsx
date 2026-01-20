@@ -17,6 +17,7 @@ const App: React.FC = () => {
   ]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [zoom, setZoom] = useState(1);
+  const [isDirty, setIsDirty] = useState(false);
   
   // Modals state
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
@@ -44,7 +45,7 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const isInitialLoadComplete = useRef(false);
 
-  // 1. STRICT AUTO-LOAD FROM project-data.json
+  // 1. STRICT AUTO-LOAD FROM project-data.json (NO LOCALSTORAGE)
   useEffect(() => {
     const loadProjectFile = async () => {
       try {
@@ -54,21 +55,27 @@ const App: React.FC = () => {
           if (data.tables) setTables(data.tables);
           if (data.groups) setGroups(data.groups);
           if (data.relationships) setRelationships(data.relationships);
-          if (data.zoom) setZoom(data.zoom);
-          console.log("Visual architecture synced from project-data.json");
-        } else {
-          console.log("No project-data.json found in directory. Starting with default state.");
+          if (data.zoom) setZoom(data.zoom || 1);
+          console.log("Visual architecture strictly loaded from project-data.json");
         }
       } catch (e) {
-        console.warn("Project file not available or invalid JSON.");
+        console.error("Critical: Could not load project-data.json from repository.");
       }
-      isInitialLoadComplete.current = true;
+      setTimeout(() => { isInitialLoadComplete.current = true; }, 200);
     };
 
     loadProjectFile();
   }, []);
 
-  // 2. EXPORT: Generate file to be committed to Git
+  // 2. DETECT MANUAL UPDATES (Dirty State)
+  // Whenever state changes after initial load, mark as "Dirty" to remind user to sync/save.
+  useEffect(() => {
+    if (isInitialLoadComplete.current) {
+      setIsDirty(true);
+    }
+  }, [tables, groups, relationships, zoom]);
+
+  // 3. EXPORT/SYNC: Write to the project file (User replaces local file and pushes to Git)
   const handleExport = () => {
     const state: AppState = { 
       tables, 
@@ -85,6 +92,7 @@ const App: React.FC = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    setIsDirty(false); // Reset dirty state after sync
   };
 
   const autoLinkTables = useCallback((currentTables: Table[], currentRels: Relationship[]) => {
@@ -119,7 +127,7 @@ const App: React.FC = () => {
   const handleDeleteRelation = (id: string) => {
     setConfirmModal({
       isOpen: true, title: 'Delete Relationship',
-      message: 'Remove this relationship from the visual schema?',
+      message: 'Remove this relationship? Don\'t forget to SYNC to update the project file.',
       onConfirm: () => {
         setRelationships(prev => prev.filter(r => r.id !== id));
         setConfirmModal(p => ({ ...p, isOpen: false }));
@@ -132,28 +140,12 @@ const App: React.FC = () => {
     if (!table) return;
     const linkedRels = relationships.filter(r => r.fromTableId === id || r.toTableId === id);
     let message = `Delete table "${table.name}"?`;
-    if (linkedRels.length > 0) message += `\n\nWarning: ${linkedRels.length} linked relationships will also be removed.`;
+    if (linkedRels.length > 0) message += `\n\nNote: ${linkedRels.length} relationships will also be removed. Sync required.`;
     setConfirmModal({
       isOpen: true, title: 'Delete Table', message,
       onConfirm: () => {
         setTables(prev => prev.filter(t => t.id !== id));
         setRelationships(prev => prev.filter(r => r.fromTableId !== id && r.toTableId !== id));
-        setConfirmModal(p => ({ ...p, isOpen: false }));
-      }
-    });
-  };
-
-  const handleDeleteGroup = (id: string) => {
-    const group = groups.find(g => g.id === id);
-    if (!group) return;
-    const groupTables = tables.filter(t => t.groupIds.includes(id));
-    let message = `Delete group "${group.name}"?`;
-    if (groupTables.length > 0) message += `\n\nNote: Tables will stay on canvas but lose group alignment.`;
-    setConfirmModal({
-      isOpen: true, title: 'Delete Group', message,
-      onConfirm: () => {
-        setGroups(prev => prev.filter(g => g.id !== id));
-        setTables(prev => prev.map(t => ({ ...t, groupIds: t.groupIds.filter(gid => gid !== id) })));
         setConfirmModal(p => ({ ...p, isOpen: false }));
       }
     });
@@ -189,9 +181,19 @@ const App: React.FC = () => {
     <div className="flex h-screen w-full bg-[#f8fafc] text-slate-900 overflow-hidden font-sans">
       <Sidebar 
         groups={groups} 
+        isDirty={isDirty}
         onAddGroup={() => { setEditingGroup(null); setIsGroupModalOpen(true); }}
         onEditGroup={(g) => { setEditingGroup(g); setIsGroupModalOpen(true); }}
-        onDeleteGroup={handleDeleteGroup}
+        onDeleteGroup={(id) => {
+          setConfirmModal({
+            isOpen: true, title: 'Delete Group', message: 'Delete group? Tables will remain but lose group association.',
+            onConfirm: () => {
+              setGroups(prev => prev.filter(g => g.id !== id));
+              setTables(prev => prev.map(t => ({ ...t, groupIds: t.groupIds.filter(gid => gid !== id) })));
+              setConfirmModal(p => ({ ...p, isOpen: false }));
+            }
+          });
+        }}
         onExport={handleExport}
       />
 
@@ -214,8 +216,8 @@ const App: React.FC = () => {
                <span className="text-[10px] font-black w-10 text-center">{Math.round(zoom * 100)}%</span>
                <button onClick={() => setZoom(Math.min(3, zoom + 0.1))} className="p-1.5 hover:bg-white rounded-lg transition-colors"><ZoomIn className="w-4 h-4" /></button>
              </div>
-             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
-             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
+             <button onClick={() => { setEditingRelation(null); setIsRelationModalOpen(true); }} className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm"><LinkIcon className="w-3.5 h-3.5 inline mr-2" /> Connect</button>
+             <button onClick={() => { setEditingTable(null); setIsTableModalOpen(true); }} className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-md active:scale-95"><Plus className="w-3.5 h-3.5 inline mr-2" /> Add Table</button>
           </div>
         </header>
 
